@@ -53,9 +53,12 @@ enum CliSubcommand {
         /// Automatically repack loose objects.
         #[arg(long = "repack", default_value_t = false)]
         use_repack: bool,
-        /// Extra glob patterns to include
+        /// Glob patterns to additionally include
         #[arg(short = 'p', long)]
         extra_patterns: Vec<String>,
+        /// Glob patterns to explicit ignore
+        #[arg(short = 'i', long)]
+        ignore_patterns: Vec<String>,
     },
     /// Restore save from commit
     Checkout {
@@ -95,10 +98,10 @@ fn main() -> Result<(), anyhow::Error> {
 
     match cli.action {
         CliSubcommand::Flatten { save_dir, repo_dir } => {
-            Config::new(save_dir, repo_dir, vec![]).flatten()
+            Config::new(save_dir, repo_dir, vec![], vec![]).flatten()
         }
         CliSubcommand::Unflatten { save_dir, repo_dir } => {
-            Config::new(save_dir, repo_dir, vec![]).unflatten()
+            Config::new(save_dir, repo_dir, vec![], vec![]).unflatten()
         }
         CliSubcommand::Commit {
             save_dir,
@@ -108,6 +111,7 @@ fn main() -> Result<(), anyhow::Error> {
             message,
             use_repack,
             extra_patterns,
+            ignore_patterns,
         } => {
             let parents = {
                 let mut cmd = git_cmd(&git_dir, ["rev-parse", &format!("{branch}^{{commit}}")]);
@@ -135,17 +139,19 @@ fn main() -> Result<(), anyhow::Error> {
             let size_before = git_count_objects(git_dir.to_owned())
                 .context("failed to count git objects")?
                 .total_size_mib();
-            let unprocessed = Config::new(save_dir, git_dir.to_owned(), extra_patterns).commit(
-                parents,
-                &message,
-                Some(r#ref),
-            )?;
+            let unprocessed = Config::new(
+                save_dir,
+                git_dir.to_owned(),
+                extra_patterns,
+                ignore_patterns,
+            )
+            .commit(parents, &message, Some(r#ref))?;
             if unprocessed.len() > 0 {
                 for item in &unprocessed {
-                    log::warn!("Skipped file: {item}");
+                    log::error!("Skipped file: {item}");
                 }
-                log::warn!(
-                    "Skipped {} files because they are not caught by any handler. Catch them via -p argument, e.g. -p SDMEconomy/*.data",
+                anyhow::bail!(
+                    "Skipped {} files because they are not caught by any handler. Catch them via -p or ignore them via -i.",
                     unprocessed.len()
                 );
             }
@@ -176,7 +182,7 @@ fn main() -> Result<(), anyhow::Error> {
                 log::warn!("save_dir {save_dir:?} already exists, renaming to {bak:?}");
                 std::fs::rename(&save_dir, &bak).context("failed to rename save directory")?;
             }
-            Config::new(save_dir, git_dir, vec![]).checkout(commit)?;
+            Config::new(save_dir, git_dir, vec![], vec![]).checkout(commit)?;
             log::info!("Done");
             Ok(())
         }

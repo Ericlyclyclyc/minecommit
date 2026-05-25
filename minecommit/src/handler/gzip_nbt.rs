@@ -11,7 +11,7 @@ use crate::{
     utils::nbt::{dump_nbt, load_nbt, sort_nbt},
 };
 
-const GZIP_NBT_GLOB_PATTERNS: &[&str] = &["**/*.dat"];
+const GZIP_NBT_GLOB_PATTERNS: &[&str] = &["**/*.dat", "**/*.nbt"];
 
 pub(crate) struct GzipNbtHandler {}
 
@@ -30,7 +30,7 @@ impl Handler for GzipNbtHandler {
                         .context("failed to decompress gzip data")?;
                     decompressed
                 } else {
-                    log::warn!(
+                    log::info!(
                         "Failed to decompress because header is invalid, treat as uncompressed"
                     );
                     compressed

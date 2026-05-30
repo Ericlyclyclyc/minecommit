@@ -70,7 +70,9 @@ export function AppSidebar() {
               <SidebarMenuItem key={to}>
                 <SidebarMenuButton
                   render={<NavLink to={to} end />}
-                  isActive={to === "/" ? pathname === "/" : pathname.startsWith(to)}
+                  isActive={
+                    to === "/" ? pathname === "/" : pathname.startsWith(to)
+                  }
                 >
                   <Icon />
                   {label}
@@ -83,7 +85,10 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<NavLink to="/settings" />} isActive={pathname === "/settings"}>
+            <SidebarMenuButton
+              render={<NavLink to="/settings" />}
+              isActive={pathname === "/settings"}
+            >
               <Settings />
               设置
             </SidebarMenuButton>

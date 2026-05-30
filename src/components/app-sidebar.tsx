@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom"
+import { NavLink } from "react-router-dom"
 import {
   Sidebar,
   SidebarContent,
@@ -24,15 +24,19 @@ import {
   LayoutDashboard,
   Settings,
 } from "lucide-react"
+import { useState } from "react"
 
-const navItems = [
+const allItems = [
   { to: "/", label: "主页", icon: House },
   { to: "/dashboard", label: "看板", icon: LayoutDashboard },
   { to: "/history", label: "历史", icon: History },
+  { to: "/settings", label: "设置", icon: Settings },
 ]
+const navItems = allItems.slice(0, -1)
+const settingsItem = allItems.at(-1)
 
 export function AppSidebar() {
-  const { pathname } = useLocation()
+  const [activeItem, setActiveItem] = useState(navItems[0])
 
   return (
     <Sidebar collapsible="icon">
@@ -67,16 +71,15 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
-            {navItems.map(({ to, label, icon: Icon }) => (
-              <SidebarMenuItem key={to}>
+            {navItems.map((item) => (
+              <SidebarMenuItem key={item.to}>
                 <SidebarMenuButton
-                  render={<NavLink to={to} end />}
-                  isActive={
-                    to === "/" ? pathname === "/" : pathname.startsWith(to)
-                  }
+                  render={<NavLink to={item.to} end />}
+                  isActive={item.to === activeItem.to}
+                  onClick={() => setActiveItem(item)}
                 >
-                  <Icon />
-                  {label}
+                  <item.icon />
+                  {item.label}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
@@ -88,7 +91,8 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               render={<NavLink to="/settings" />}
-              isActive={pathname === "/settings"}
+              isActive={activeItem.to === "/settings"}
+              onClick={() => setActiveItem(settingsItem || navItems[0])}
             >
               <Settings />
               设置

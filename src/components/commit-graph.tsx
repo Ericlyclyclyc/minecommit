@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Popover } from "radix-ui"
+import * as ReactDOM from "react-dom"
 import { cn } from "@/lib/utils"
 
 interface CommitAuthor {
@@ -359,83 +359,109 @@ function CommitDetail({
   commit: Commit
   hashLength: number
   railColor: string
-  children: React.ReactNode
+  children: React.ReactElement
 }) {
+  const [open, setOpen] = React.useState(false)
+  const [pos, setPos] = React.useState({ x: 0, y: 0 })
+  const contentRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (
+        contentRef.current &&
+        !contentRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [open])
+
   return (
-    <Popover.Root>
-      <Popover.Trigger>{children}</Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side="right"
-          sideOffset={8}
-          className="z-50 w-80 animate-in rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-md fade-in-0 zoom-in-95 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2"
-        >
-          <div className="flex flex-col gap-2">
-            <p className="text-sm leading-snug font-medium">{commit.message}</p>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                {commit.author.avatarUrl ? (
-                  <img
-                    src={commit.author.avatarUrl}
-                    alt=""
-                    width={14}
-                    height={14}
-                    className="size-3.5 rounded-full border border-border/60 bg-muted"
-                  />
-                ) : (
-                  <span className="flex size-3.5 items-center justify-center rounded-full bg-muted text-[7px] font-bold">
-                    {commit.author.name
-                      .split(/\s+/)
-                      .map((w) => w[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2)}
-                  </span>
-                )}
-                {commit.author.name}
-              </span>
-              <span className="text-border">·</span>
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
-                {commit.hash.slice(0, hashLength)}
-              </code>
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              {formatFullDate(commit.date)}
-            </div>
-            {(commit.refs || commit.tag) && (
-              <div className="flex flex-wrap gap-1">
-                {commit.refs?.map((ref) => (
-                  <span
-                    key={ref}
-                    className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                  >
-                    {ref}
-                  </span>
-                ))}
-                {commit.tag && (
-                  <span
-                    className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-                    style={{
-                      backgroundColor: `${railColor}20`,
-                      color: railColor,
-                    }}
-                  >
-                    {commit.tag}
-                  </span>
-                )}
+    <>
+      {React.cloneElement(children as React.ReactElement, {
+        onClick: (e: React.MouseEvent) => {
+          setPos({ x: e.clientX, y: e.clientY })
+          setOpen((o) => !o)
+        },
+      })}
+      {open &&
+        ReactDOM.createPortal(
+          <div
+            ref={contentRef}
+            className="z-50 w-80 animate-in rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-md fade-in-0 zoom-in-95"
+            style={{ position: "fixed", left: pos.x, top: pos.y + 8 }}
+          >
+            <div className="flex flex-col gap-2">
+              <p className="text-sm leading-snug font-medium">
+                {commit.message}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  {commit.author.avatarUrl ? (
+                    <img
+                      src={commit.author.avatarUrl}
+                      alt=""
+                      width={14}
+                      height={14}
+                      className="size-3.5 rounded-full border border-border/60 bg-muted"
+                    />
+                  ) : (
+                    <span className="flex size-3.5 items-center justify-center rounded-full bg-muted text-[7px] font-bold">
+                      {commit.author.name
+                        .split(/\s+/)
+                        .map((w) => w[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2)}
+                    </span>
+                  )}
+                  {commit.author.name}
+                </span>
+                <span className="text-border">·</span>
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+                  {commit.hash.slice(0, hashLength)}
+                </code>
               </div>
-            )}
-            {commit.parents.length > 0 && (
-              <div className="text-[10px] text-muted-foreground/60">
-                {commit.parents.length === 1 ? "Parent" : "Parents"}:{" "}
-                {commit.parents.map((p) => p.slice(0, hashLength)).join(", ")}
+              <div className="text-[11px] text-muted-foreground">
+                {formatFullDate(commit.date)}
               </div>
-            )}
-          </div>
-          <Popover.Arrow className="fill-popover" />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+              {(commit.refs || commit.tag) && (
+                <div className="flex flex-wrap gap-1">
+                  {commit.refs?.map((ref) => (
+                    <span
+                      key={ref}
+                      className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                    >
+                      {ref}
+                    </span>
+                  ))}
+                  {commit.tag && (
+                    <span
+                      className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                      style={{
+                        backgroundColor: `${railColor}20`,
+                        color: railColor,
+                      }}
+                    >
+                      {commit.tag}
+                    </span>
+                  )}
+                </div>
+              )}
+              {commit.parents.length > 0 && (
+                <div className="text-[10px] text-muted-foreground/60">
+                  {commit.parents.length === 1 ? "Parent" : "Parents"}:{" "}
+                  {commit.parents.map((p) => p.slice(0, hashLength)).join(", ")}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   )
 }
 

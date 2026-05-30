@@ -62,7 +62,7 @@ function CommitGraphDemo() {
 
 export function HistoryPage() {
   return (
-    <div className="flex w-1/2 flex-col gap-4 p-4">
+    <div className="flex w-full flex-col gap-4 p-4">
       <CommitGraphDemo />
     </div>
   )

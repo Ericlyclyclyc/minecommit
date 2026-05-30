@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom"
+import { NavLink, useLocation } from "react-router-dom"
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +31,8 @@ const navItems = [
 ]
 
 export function AppSidebar() {
+  const { pathname } = useLocation()
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -66,7 +68,10 @@ export function AppSidebar() {
           <SidebarMenu>
             {navItems.map(({ to, label, icon: Icon }) => (
               <SidebarMenuItem key={to}>
-                <SidebarMenuButton render={<NavLink to={to} end />}>
+                <SidebarMenuButton
+                  render={<NavLink to={to} end />}
+                  isActive={to === "/" ? pathname === "/" : pathname.startsWith(to)}
+                >
                   <Icon />
                   {label}
                 </SidebarMenuButton>
@@ -78,7 +83,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<NavLink to="/settings" />}>
+            <SidebarMenuButton render={<NavLink to="/settings" />} isActive={pathname === "/settings"}>
               <Settings />
               设置
             </SidebarMenuButton>

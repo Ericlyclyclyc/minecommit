@@ -14,7 +14,13 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
 import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ChevronDown, HardDrive } from "lucide-react"
+import {
+  ChevronDown,
+  HardDrive,
+  History,
+  House,
+  LayoutDashboard,
+} from "lucide-react"
 
 export function AppSidebar() {
   return (
@@ -47,6 +53,26 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton>
+                <House />
+                主页
+              </SidebarMenuButton>
+              <SidebarMenuButton>
+                <LayoutDashboard />
+                看板
+              </SidebarMenuButton>
+              <SidebarMenuButton>
+                <History />
+                历史
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
     </Sidebar>
   )
 }

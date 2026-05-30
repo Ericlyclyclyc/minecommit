@@ -21,6 +21,14 @@ import { Field, FieldGroup } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 function CommitDialog({
   open,
@@ -123,9 +131,151 @@ function RestoreDialog({
   )
 }
 
+function PushDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const remotes = [
+    { label: "origin", value: "https://example.com/HairlessVillager/save.git" },
+    { label: "upstream", value: "https://example.com/upstream/save.git" },
+  ]
+  const branchs = [
+    { label: "main", value: "main" },
+    { label: "dev", value: "dev" },
+  ]
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <form>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>推送分支到远程仓库</DialogTitle>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <Label htmlFor="message">远程仓库</Label>
+              <Select items={remotes}>
+                <SelectTrigger className="w-45">
+                  <SelectValue placeholder="origin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {remotes.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>{" "}
+            </Field>
+            <Field>
+              <Label htmlFor="message">推送分支</Label>
+              <Select items={branchs}>
+                <SelectTrigger className="w-45">
+                  <SelectValue placeholder="main" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {branchs.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>{" "}
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline">取消</Button>}
+            ></DialogClose>
+            <Button type="submit">推送</Button>
+          </DialogFooter>
+        </DialogContent>
+      </form>
+    </Dialog>
+  )
+}
+
+function PullDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const remotes = [
+    { label: "origin", value: "https://example.com/HairlessVillager/save.git" },
+    { label: "upstream", value: "https://example.com/upstream/save.git" },
+  ]
+  const branchs = [
+    { label: "main", value: "main" },
+    { label: "dev", value: "dev" },
+  ]
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <form>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>从远程仓库拉取分支</DialogTitle>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <Label htmlFor="message">远程仓库</Label>
+              <Select items={remotes}>
+                <SelectTrigger className="w-45">
+                  <SelectValue placeholder="origin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {remotes.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>{" "}
+            </Field>
+            <Field>
+              <Label htmlFor="message">拉取分支</Label>
+              <Select items={branchs}>
+                <SelectTrigger className="w-45">
+                  <SelectValue placeholder="main" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {branchs.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>{" "}
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <DialogClose
+              render={<Button variant="outline">取消</Button>}
+            ></DialogClose>
+            <Button type="submit">拉取</Button>
+          </DialogFooter>
+        </DialogContent>
+      </form>
+    </Dialog>
+  )
+}
+
 export function HomePage() {
   const [commitDialogOpen, setCommitDialogOpen] = useState(false)
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
+  const [pushDialogOpen, setPushDialogOpen] = useState(false)
+  const [pullDialogOpen, setPullDialogOpen] = useState(false)
 
   const items = [
     {
@@ -144,8 +294,16 @@ export function HomePage() {
       onClick: () => setRestoreDialogOpen(true),
       separator: true,
     },
-    { icon: <HardDriveUpload />, label: "上传 / 推送" },
-    { icon: <HardDriveDownload />, label: "下载 / 拉取" },
+    {
+      icon: <HardDriveUpload />,
+      label: "上传 / 推送",
+      onClick: () => setPushDialogOpen(true),
+    },
+    {
+      icon: <HardDriveDownload />,
+      label: "下载 / 拉取",
+      onClick: () => setPullDialogOpen(true),
+    },
   ]
 
   return (
@@ -159,6 +317,8 @@ export function HomePage() {
         open={restoreDialogOpen}
         onOpenChange={setRestoreDialogOpen}
       />
+      <PushDialog open={pushDialogOpen} onOpenChange={setPushDialogOpen} />
+      <PullDialog open={pullDialogOpen} onOpenChange={setPullDialogOpen} />
     </div>
   )
 }

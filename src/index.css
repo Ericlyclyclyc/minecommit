@@ -128,3 +128,18 @@
     @apply font-mono;
     }
 }
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: oklch(0.553 0.013 58.071 / 40%);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(0.553 0.013 58.071 / 60%);
+}

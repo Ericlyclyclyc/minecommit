@@ -69,7 +69,7 @@ function RollingLogContent({ operation }: { operation: Operation }) {
       </AlertDialogHeader>
       <pre
         ref={preRef}
-        className="overflow-y-auto rounded-md bg-secondary p-4 font-mono text-sm whitespace-pre-wrap text-secondary-foreground"
+        className="min-h-0 overflow-y-auto rounded-md bg-secondary p-4 font-mono text-sm whitespace-pre-wrap text-secondary-foreground"
       >
         {lines.join("\n")}
       </pre>
@@ -94,7 +94,7 @@ export function RollingLogDialog({
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="fixed min-h-4/5 min-w-4/5 grid-rows-[auto_1fr_auto] flex-col">
+      <AlertDialogContent className="fixed h-4/5 min-w-4/5 grid-rows-[auto_1fr_auto] flex-col">
         {open && <RollingLogContent key={operation} operation={operation} />}
       </AlertDialogContent>
     </AlertDialog>

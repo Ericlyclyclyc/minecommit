@@ -14,10 +14,8 @@ createRoot(document.getElementById("root")!).render(
       <TooltipProvider>
         <SidebarProvider>
           <AppSidebar />
-          <main>
-            <SidebarTrigger />
-            <App />
-          </main>
+          <SidebarTrigger />
+          <App />
         </SidebarProvider>
       </TooltipProvider>
     </ThemeProvider>

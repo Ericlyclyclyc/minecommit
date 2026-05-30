@@ -8,7 +8,11 @@ import {
 } from "lucide-react"
 
 const items = [
-  { icon: <BookUp2 />, label: "快速提交 / 备份" },
+  {
+    icon: <BookUp2 />,
+    label: "快速提交 / 备份",
+    separator: true,
+  },
   { icon: <BookUp />, label: "备注提交 / 备份" },
   { icon: <BookDown />, label: "检出最近提交", separator: true },
   { icon: <HardDriveUpload />, label: "上传 / 推送" },
@@ -18,7 +22,7 @@ const items = [
 export function HomePage() {
   return (
     <div className="flex w-full items-center justify-center">
-      <Dock items={items} gap={6} />
+      <Dock items={items} />
     </div>
   )
 }

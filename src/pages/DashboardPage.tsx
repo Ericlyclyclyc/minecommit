@@ -78,8 +78,8 @@ export function ChartLineLabel() {
             data={lineChartData}
             margin={{
               top: 20,
-              left: 12,
-              right: 12,
+              left: 30,
+              right: 20,
             }}
           >
             <CartesianGrid vertical={false} />
@@ -88,7 +88,7 @@ export function ChartLineLabel() {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(value) => value.slice(0, 3)}
+              tickFormatter={(value) => value}
             />
             <ChartTooltip
               cursor={false}

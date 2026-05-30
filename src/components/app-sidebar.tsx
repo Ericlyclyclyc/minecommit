@@ -1,3 +1,4 @@
+import { NavLink } from "react-router-dom"
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +23,12 @@ import {
   LayoutDashboard,
   Settings,
 } from "lucide-react"
+
+const navItems = [
+  { to: "/", label: "主页", icon: House },
+  { to: "/dashboard", label: "看板", icon: LayoutDashboard },
+  { to: "/history", label: "历史", icon: History },
+]
 
 export function AppSidebar() {
   return (
@@ -57,27 +64,21 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton>
-                <House />
-                主页
-              </SidebarMenuButton>
-              <SidebarMenuButton>
-                <LayoutDashboard />
-                看板
-              </SidebarMenuButton>
-              <SidebarMenuButton>
-                <History />
-                历史
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {navItems.map(({ to, label, icon: Icon }) => (
+              <SidebarMenuItem key={to}>
+                <SidebarMenuButton render={<NavLink to={to} end />}>
+                  <Icon />
+                  {label}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton>
+            <SidebarMenuButton render={<NavLink to="/settings" />}>
               <Settings />
               设置
             </SidebarMenuButton>

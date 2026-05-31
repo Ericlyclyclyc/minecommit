@@ -5,7 +5,7 @@ use simdnbt::borrow;
 use simdnbt::owned::{self, BaseNbt, NbtCompound, NbtList, NbtTag};
 use simdnbt::{Deserialize, DeserializeError, Serialize};
 
-use super::palette::{BlockStateEntry, dump_biome, dump_block, load_biome, load_block};
+use super::palette::{BlockStateEntry, biome_palette_names, block_palette_entries, dump_biome_data, dump_block_data, load_biome, load_block};
 
 pub fn split_chunk(nbt: BaseNbt) -> Result<(BaseNbt, SectionsDump)> {
     let name = nbt.name().to_owned();
@@ -40,42 +40,38 @@ pub fn restore_chunk(other: BaseNbt, dump: SectionsDump) -> Result<BaseNbt> {
     Ok(BaseNbt::new(name, other))
 }
 
-/// Collect local palette dumps from each section, then merge them into a
-/// single shared palette per chunk.  Each section's data arrays are
-/// remapped from local palette indices to the merged palette indices.
+/// Two-pass dump: extract palettes first, then unpack data directly with
+/// merged palette indices — no remapping pass needed.
 fn dump_sections(sections: &NbtList) -> Result<SectionsDump> {
-    let sections = sections
+    let sections_compounds = sections
         .compounds()
         .context("expect sections is a NBT compound list, got: {sections:#?}")?;
-    let sections_len = sections.len();
+    let sections_len = sections_compounds.len();
 
-    // Pass 1: dump each section with its own local palette
-    struct LocalSection {
+    // Pass 1 — palette scan only (no data unpacking).
+    struct SecMeta {
         y: i8,
         local_biome_palette: Vec<String>,
-        biome_data: Box<[u8; 64]>,
         local_block_palette: Vec<BlockStateEntry>,
-        block_data: Box<[u16; 4096]>,
+        has_palettes: bool,
     }
-    let mut locals: Vec<LocalSection> = Vec::with_capacity(sections_len);
-    for (idx, section) in sections.iter().enumerate() {
+    let mut metas: Vec<SecMeta> = Vec::with_capacity(sections_len);
+    for (idx, section) in sections_compounds.iter().enumerate() {
         let y = section.byte("Y").with_context(|| {
             format!("missing NBT byte 'sections.{idx}.Y', got: {section:#?}")
         })?;
         if let Some(biome) = section.compound("biomes")
             && let Some(block_states) = section.compound("block_states")
         {
-            let (local_biome_palette, biome_data) = dump_biome(biome)?;
-            let (local_block_palette, block_data) = dump_block(block_states)?;
-            locals.push(LocalSection {
+            let local_biome_palette = biome_palette_names(biome)?;
+            let local_block_palette = block_palette_entries(block_states)?;
+            metas.push(SecMeta {
                 y,
                 local_biome_palette,
-                biome_data,
                 local_block_palette,
-                block_data,
+                has_palettes: true,
             });
         } else if idx == 0 || idx == sections_len - 1 {
-            // Boundary sections outside world limits — skip.
             log::trace!(
                 "Missing field 'biomes' or/and 'block_states' in 'sections.{idx}' (y={y}), all fields got: {:?}",
                 section.keys().map(|s| s.to_str()).collect::<Vec<_>>()
@@ -88,54 +84,62 @@ fn dump_sections(sections: &NbtList) -> Result<SectionsDump> {
         }
     }
 
-    // Pass 2: build merged palettes (order-stable dedup)
-    let mut biome_palette: Vec<String> = Vec::new();
-    let mut biome_index: HashMap<String, u8> = HashMap::new();
-    let mut block_palette: Vec<BlockStateEntry> = Vec::new();
-    let mut block_index: HashMap<BlockStateEntry, u16> = HashMap::new();
+    // Build merged palettes and per-section local→merged index maps.
+    let mut biome_merged: Vec<String> = Vec::new();
+    let mut biome_hash: HashMap<String, u8> = HashMap::new();
+    let mut block_merged: Vec<BlockStateEntry> = Vec::new();
+    let mut block_hash: HashMap<BlockStateEntry, u16> = HashMap::new();
 
-    for loc in &locals {
-        for name in &loc.local_biome_palette {
-            if let std::collections::hash_map::Entry::Vacant(e) = biome_index.entry(name.clone()) {
-                let idx = biome_palette.len() as u8;
-                biome_palette.push(name.clone());
-                e.insert(idx);
-            }
+    let mut biome_maps: Vec<Vec<u8>> = Vec::with_capacity(metas.len());
+    let mut block_maps: Vec<Vec<u16>> = Vec::with_capacity(metas.len());
+
+    for meta in &metas {
+        let mut bm = Vec::with_capacity(meta.local_biome_palette.len());
+        for name in &meta.local_biome_palette {
+            bm.push(*biome_hash.entry(name.clone()).or_insert_with(|| {
+                let idx = biome_merged.len() as u8;
+                biome_merged.push(name.clone());
+                idx
+            }));
         }
-        for entry in &loc.local_block_palette {
-            if let std::collections::hash_map::Entry::Vacant(e) = block_index.entry(entry.clone()) {
-                let idx = block_palette.len() as u16;
-                block_palette.push(entry.clone());
-                e.insert(idx);
-            }
+        biome_maps.push(bm);
+
+        let mut bkm = Vec::with_capacity(meta.local_block_palette.len());
+        for entry in &meta.local_block_palette {
+            bkm.push(*block_hash.entry(entry.clone()).or_insert_with(|| {
+                let idx = block_merged.len() as u16;
+                block_merged.push(entry.clone());
+                idx
+            }));
         }
+        block_maps.push(bkm);
     }
 
-    // Pass 3: remap each section's data from local → merged indices
-    let sections: Vec<Section> = locals
-        .into_iter()
-        .map(|loc| {
-            let mut biome_data = loc.biome_data;
-            for v in biome_data.iter_mut() {
-                let name = &loc.local_biome_palette[*v as usize];
-                *v = biome_index[name];
-            }
-            let mut block_data = loc.block_data;
-            for v in block_data.iter_mut() {
-                let entry = &loc.local_block_palette[*v as usize];
-                *v = block_index[entry];
-            }
-            Section {
-                y: loc.y,
-                biome_data,
-                block_data,
-            }
-        })
-        .collect();
+    // Pass 2 — unpack data directly with merged-index maps.
+    let mut sections = Vec::with_capacity(metas.len());
+    for (((section, meta), biome_map), block_map) in
+        sections_compounds.iter()
+            .zip(metas.into_iter())
+            .zip(biome_maps.into_iter())
+            .zip(block_maps.into_iter())
+    {
+        if !meta.has_palettes {
+            continue;
+        }
+        let biome = section.compound("biomes").unwrap();
+        let block_states = section.compound("block_states").unwrap();
+        sections.push(Section {
+            y: meta.y,
+            biome_data: dump_biome_data(biome, &biome_map)
+                .with_context(|| format!("failed to dump biome data for y={}", meta.y))?,
+            block_data: dump_block_data(block_states, &block_map)
+                .with_context(|| format!("failed to dump block data for y={}", meta.y))?,
+        });
+    }
 
     Ok(SectionsDump {
-        biome_palette,
-        block_palette,
+        biome_palette: biome_merged,
+        block_palette: block_merged,
         sections,
     })
 }

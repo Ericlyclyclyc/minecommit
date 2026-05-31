@@ -19,8 +19,16 @@ fn fast_count_bits(n: usize) -> usize {
     usize::BITS as usize - m.leading_zeros() as usize
 }
 
-pub fn dump<T: Copy + Default + Eq, const SIZE: usize>(
-    palette_rows: &[u64],
+// ---------------------------------------------------------------------------
+// Generic palette ↔ cube conversions
+// ---------------------------------------------------------------------------
+
+/// Unpack Minecraft packed long-array palette data into a dense 3-D cube.
+/// `palette_entries` maps a local palette index to the value stored in the
+/// cube — for disjoint-index dumps this is the merged-index table, for
+/// self-contained dumps it is `&[0u8, 1u8, 2u8, …]`.
+fn unpack_palette<T: Copy + Default + Eq, const SIZE: usize>(
+    packed_rows: &[u64],
     palette_entries: &[T],
     count_bits: impl Fn(usize) -> usize,
 ) -> Box<Cube<T, SIZE>> {
@@ -30,12 +38,11 @@ pub fn dump<T: Copy + Default + Eq, const SIZE: usize>(
     let mut cube = Box::new([[[T::default(); SIZE]; SIZE]; SIZE]);
 
     let flattened_cube = cube.as_flattened_mut().as_flattened_mut();
-    for (cube_chunk, row) in flattened_cube.chunks_mut(chunk_size).zip(palette_rows) {
+    for (cube_chunk, row) in flattened_cube.chunks_mut(chunk_size).zip(packed_rows) {
         let mut row = *row;
         for cube_elem in cube_chunk.iter_mut() {
             let palette_index = (row & mask) as usize;
-            let palette_entry = palette_entries[palette_index];
-            *cube_elem = palette_entry;
+            *cube_elem = palette_entries[palette_index];
             row >>= bits;
         }
     }
@@ -43,9 +50,9 @@ pub fn dump<T: Copy + Default + Eq, const SIZE: usize>(
     cube
 }
 
-/// Pack palette indices from a dense cube back into packed long array rows,
-/// using the known palette size to determine bit width.
-fn pack_from_cube<T: Into<u64> + Copy, const SIZE: usize>(
+/// Pack a dense 3-D cube back into Minecraft long-array rows, using the
+/// known palette size to determine the encoding bit width.
+fn pack_cube<T: Into<u64> + Copy, const SIZE: usize>(
     cube: &Cube<T, SIZE>,
     palette_len: usize,
     count_bits: impl Fn(usize) -> usize,
@@ -67,31 +74,42 @@ fn pack_from_cube<T: Into<u64> + Copy, const SIZE: usize>(
     rows
 }
 
-/// Dump a biome palette section into `(palette, 64-byte indexed data)`.
-/// Each byte in `data` is an index into the local `palette` vector.
-pub fn dump_biome(nbt: &NbtCompound) -> Result<(Vec<String>, Box<[u8; 64]>)> {
-    let palette: Vec<String> = nbt
+// ---------------------------------------------------------------------------
+// Biome helpers
+// ---------------------------------------------------------------------------
+
+/// Extract only the palette string list from a biome NBT compound
+/// (no data unpacking).
+pub fn biome_palette_names(nbt: &NbtCompound) -> Result<Vec<String>> {
+    Ok(nbt
         .list("palette")
         .with_context(|| format!("missing NBT list 'palette' in biome, got: {nbt:#?}"))?
         .strings()
-        .with_context(|| format!("expect biome 'palette' is a NBT string list"))?
-        .into_iter()
+        .with_context(|| "expect biome 'palette' is a NBT string list")?
+        .iter()
         .map(|s| s.to_string())
-        .collect();
-
-    let palette_indices: Vec<u8> = (0..palette.len() as u8).collect();
-    let palette_rows = nbt.long_array("data");
-
-    let cube: Box<Cube<u8, 4>> = if let Some(rows) = palette_rows {
-        dump::<u8, 4>(bytemuck::cast_slice(rows), &palette_indices, fast_count_bits)
-    } else {
-        bytemuck::allocation::cast_box(Box::new([palette_indices.first().copied().unwrap_or(0); 64]))
-    };
-
-    Ok((palette, bytemuck::allocation::cast_box(cube)))
+        .collect())
 }
 
-/// Load a biome palette section from `(palette, 64-byte indexed data)`.
+/// Unpack biome data from NBT into a 64-byte flat array.  Each byte is
+/// obtained by translating the local palette index through `local_to_merged`
+/// so callers can produce merged-indexed data in one shot.
+pub fn dump_biome_data(
+    nbt: &NbtCompound,
+    local_to_merged: &[u8],
+) -> Result<Box<[u8; 64]>> {
+    let cube: Box<Cube<u8, 4>> = if let Some(rows) = nbt.long_array("data") {
+        unpack_palette::<u8, 4>(bytemuck::cast_slice(rows), local_to_merged, fast_count_bits)
+    } else {
+        // No data → homogeneous single-value palette
+        let val = local_to_merged.first().copied().unwrap_or(0);
+        bytemuck::allocation::cast_box(Box::new([val; 64]))
+    };
+    Ok(bytemuck::allocation::cast_box(cube))
+}
+
+/// Reconstruct a biome NBT compound from a local palette and 64-byte
+/// indexed data.
 pub fn load_biome(palette: Vec<String>, data: Box<[u8; 64]>) -> Result<NbtCompound> {
     let cube: Box<Cube<u8, 4>> = bytemuck::allocation::cast_box(data);
 
@@ -112,7 +130,7 @@ pub fn load_biome(palette: Vec<String>, data: Box<[u8; 64]>) -> Result<NbtCompou
             )])),
         )]
     } else {
-        let rows = pack_from_cube(&cube, palette.len(), fast_count_bits);
+        let rows = pack_cube(&cube, palette.len(), fast_count_bits);
         let entries: Vec<Mutf8String> = palette
             .into_iter()
             .map(|s| Mutf8String::from_string(s))
@@ -125,14 +143,17 @@ pub fn load_biome(palette: Vec<String>, data: Box<[u8; 64]>) -> Result<NbtCompou
     Ok(NbtCompound::from_values(kvs))
 }
 
-/// Dump a block state palette section into `(palette, 4096-u16 indexed data)`.
-/// Each u16 in `data` is an index into the local `palette` vector.
-pub fn dump_block(nbt: &NbtCompound) -> Result<(Vec<BlockStateEntry>, Box<[u16; 4096]>)> {
-    let palette: Vec<BlockStateEntry> = nbt
-        .list("palette")
+// ---------------------------------------------------------------------------
+// Block-state helpers
+// ---------------------------------------------------------------------------
+
+/// Extract only the palette entry list from a block-state NBT compound
+/// (no data unpacking).
+pub fn block_palette_entries(nbt: &NbtCompound) -> Result<Vec<BlockStateEntry>> {
+    nbt.list("palette")
         .with_context(|| format!("missing NBT list 'palette' in block_states, got: {nbt:#?}"))?
         .compounds()
-        .with_context(|| format!("expect block 'palette' is a NBT compound list"))?
+        .with_context(|| "expect block 'palette' is a NBT compound list")?
         .into_iter()
         .enumerate()
         .map(|(idx, entry)| {
@@ -160,27 +181,33 @@ pub fn dump_block(nbt: &NbtCompound) -> Result<(Vec<BlockStateEntry>, Box<[u16; 
             };
             Ok(BlockStateEntry { name, properties })
         })
-        .collect::<Result<Vec<_>>>()?;
-
-    let palette_indices: Vec<u16> = (0..palette.len() as u16).collect();
-    let palette_rows = nbt.long_array("data");
-
-    let cube: Box<Cube<u16, 16>> = if let Some(rows) = palette_rows {
-        let count_bits = |n: usize| fast_count_bits(n).max(4);
-        dump::<u16, 16>(bytemuck::cast_slice(rows), &palette_indices, count_bits)
-    } else {
-        bytemuck::allocation::cast_box(Box::new([palette_indices.first().copied().unwrap_or(0); 4096]))
-    };
-
-    Ok((palette, bytemuck::allocation::cast_box(cube)))
+        .collect::<Result<Vec<_>>>()
 }
 
-/// Load a block state palette section from `(palette, 4096-u16 indexed data)`.
+/// Unpack block-state data from NBT into a 4096-u16 flat array.  Each u16
+/// is obtained by translating the local palette index through
+/// `local_to_merged`.
+pub fn dump_block_data(
+    nbt: &NbtCompound,
+    local_to_merged: &[u16],
+) -> Result<Box<[u16; 4096]>> {
+    let count_bits = |n: usize| fast_count_bits(n).max(4);
+    let cube: Box<Cube<u16, 16>> = if let Some(rows) = nbt.long_array("data") {
+        unpack_palette::<u16, 16>(bytemuck::cast_slice(rows), local_to_merged, count_bits)
+    } else {
+        let val = local_to_merged.first().copied().unwrap_or(0);
+        bytemuck::allocation::cast_box(Box::new([val; 4096]))
+    };
+    Ok(bytemuck::allocation::cast_box(cube))
+}
+
+/// Reconstruct a block-state NBT compound from a local palette and
+/// 4096-u16 indexed data.
 pub fn load_block(palette: Vec<BlockStateEntry>, data: Box<[u16; 4096]>) -> Result<NbtCompound> {
     let cube: Box<Cube<u16, 16>> = bytemuck::allocation::cast_box(data);
     let count_bits = |n: usize| fast_count_bits(n).max(4);
     let bits = count_bits(palette.len());
-    let rows = pack_from_cube(&cube, palette.len(), count_bits);
+    let rows = pack_cube(&cube, palette.len(), count_bits);
 
     let entries: Vec<NbtTag> = palette
         .into_iter()

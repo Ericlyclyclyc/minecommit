@@ -20,6 +20,10 @@ const UNFLATTEN_PATTERNS: &[&str] = &["**/region/r.*.*.mca/timestamp-header"]; /
 pub(crate) struct ChunkRegionHandler;
 
 impl Handler for ChunkRegionHandler {
+    fn workspace(&self) -> &'static str {
+        "chunk-region"
+    }
+
     fn flatten(self, save: &impl OdbReader, storage: &mut impl OdbWriter) -> Result<Vec<String>> {
         let mut processed = Vec::new();
         for pattern in FLATTEN_PATTERNS {

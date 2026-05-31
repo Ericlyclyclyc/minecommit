@@ -13,6 +13,10 @@ const UNFLATTEN_PATTERNS: &[&str] = &["**/poi/r.*.*.mca/timestamp-header"];
 pub(crate) struct PoiRegionHandler;
 
 impl Handler for PoiRegionHandler {
+    fn workspace(&self) -> &'static str {
+        "poi-region"
+    }
+
     fn flatten(self, save: &impl OdbReader, storage: &mut impl OdbWriter) -> Result<Vec<String>> {
         let mut processed = Vec::new();
         for pattern in FLATTEN_PATTERNS {

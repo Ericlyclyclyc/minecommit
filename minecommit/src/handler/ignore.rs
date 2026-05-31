@@ -8,6 +8,10 @@ pub(crate) struct IgnoreHandler {
 }
 
 impl Handler for IgnoreHandler {
+    fn workspace(&self) -> &'static str {
+        "ignore"
+    }
+
     fn flatten(self, save: &impl OdbReader, _storage: &mut impl OdbWriter) -> Result<Vec<String>> {
         let mut processed = Vec::new();
         for pattern in &self.ignore_patterns {

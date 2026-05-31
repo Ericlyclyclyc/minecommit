@@ -16,6 +16,10 @@ const GZIP_NBT_GLOB_PATTERNS: &[&str] = &["**/*.dat", "**/*.dat_old", "**/*.nbt"
 pub(crate) struct GzipNbtHandler {}
 
 impl Handler for GzipNbtHandler {
+    fn workspace(&self) -> &'static str {
+        "gzip-nbt"
+    }
+
     fn flatten(self, save: &impl OdbReader, storage: &mut impl OdbWriter) -> Result<Vec<String>> {
         let mut processed = Vec::new();
         for pattern in GZIP_NBT_GLOB_PATTERNS {

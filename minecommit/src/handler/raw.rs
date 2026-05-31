@@ -16,6 +16,10 @@ pub(crate) struct RawHandler {
 }
 
 impl Handler for RawHandler {
+    fn workspace(&self) -> &'static str {
+        "raw"
+    }
+
     fn flatten(self, save: &impl OdbReader, storage: &mut impl OdbWriter) -> Result<Vec<String>> {
         let mut processed = Vec::new();
         let builtin = RAW_GLOB_PATTERNS.iter().copied();

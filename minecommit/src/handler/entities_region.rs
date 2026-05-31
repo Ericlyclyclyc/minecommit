@@ -13,6 +13,10 @@ const UNFLATTEN_PATTERNS: &[&str] = &["**/entities/r.*.*.mca/timestamp-header"];
 pub(crate) struct EntitiesRegionHandler;
 
 impl Handler for EntitiesRegionHandler {
+    fn workspace(&self) -> &'static str {
+        "entities-region"
+    }
+
     fn flatten(self, save: &impl OdbReader, storage: &mut impl OdbWriter) -> Result<Vec<String>> {
         let mut processed = Vec::new();
         for pattern in FLATTEN_PATTERNS {

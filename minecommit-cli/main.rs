@@ -136,7 +136,7 @@ fn main() -> Result<(), anyhow::Error> {
             };
             let r#ref = format!("refs/heads/{}", &branch);
 
-            let size_before = git_count_objects(git_dir.to_owned())
+            let size_before = git_count_objects(&git_dir)
                 .context("failed to count git objects")?
                 .total_size_mib();
             let unprocessed = Config::new(
@@ -146,7 +146,7 @@ fn main() -> Result<(), anyhow::Error> {
                 ignore_patterns,
             )
             .commit(parents, &message, Some(r#ref))?;
-            if unprocessed.len() > 0 {
+            if !unprocessed.is_empty() {
                 for item in &unprocessed {
                     log::error!("Skipped file: {item}");
                 }
@@ -158,12 +158,12 @@ fn main() -> Result<(), anyhow::Error> {
 
             if use_repack {
                 git_count_objects(&git_dir).context("failed to count git objects")?;
-                git_repack(git_dir.to_owned())?;
+                git_repack(&git_dir)?;
             } else {
                 log::warn!("--repack is not enabled, Git repository can get bloated")
             }
 
-            let size_after = git_count_objects(git_dir.to_owned())
+            let size_after = git_count_objects(&git_dir)
                 .context("failed to count git objects")?
                 .total_size_mib();
             log::info!(
@@ -187,48 +187,51 @@ fn main() -> Result<(), anyhow::Error> {
             Ok(())
         }
 
-        CliSubcommand::Utils { action } => Ok(match action {
-            UtilsSubcommand::Chunk {
-                region_path,
-                chunk_x,
-                chunk_z,
-            } => {
-                use minecommit::utils::region::{parse_xz, read_region};
-                use std::fs;
-                use std::io::{self, Write};
+        CliSubcommand::Utils { action } => {
+            let _: () = match action {
+                UtilsSubcommand::Chunk {
+                    region_path,
+                    chunk_x,
+                    chunk_z,
+                } => {
+                    use minecommit::utils::region::{parse_xz, read_region};
+                    use std::fs;
+                    use std::io::{self, Write};
 
-                let (region_x, region_z) = parse_xz(
-                    region_path
-                        .file_name()
-                        .context("invalid region path")?
-                        .to_str()
-                        .context("region path contains invalid UTF-8")?,
-                )
-                .context("failed to parse region filename")?;
-                let (_, xz_nbts) = read_region(
-                    fs::File::open(region_path).context("failed to open region file")?,
-                    region_x,
-                    region_z,
-                )
-                .context("failed to read region file")?
-                .context("region file is empty")?;
-                let (_, _, nbt) = xz_nbts
-                    .iter()
-                    .find(|(x, z, _)| *x == chunk_x && *z == chunk_z)
-                    .with_context(|| {
-                        format!(
-                            "missing chunk, all chunk positions: {:#?}",
-                            xz_nbts
-                                .iter()
-                                .map(|(x, z, _)| format!("({x}, {z})"))
-                                .collect::<Vec<_>>()
-                        )
-                    })
-                    .context("chunk not found")?;
-                io::stdout()
-                    .write_all(nbt)
-                    .context("failed to write to stdout")?;
-            }
-        }),
+                    let (region_x, region_z) = parse_xz(
+                        region_path
+                            .file_name()
+                            .context("invalid region path")?
+                            .to_str()
+                            .context("region path contains invalid UTF-8")?,
+                    )
+                    .context("failed to parse region filename")?;
+                    let (_, xz_nbts) = read_region(
+                        fs::File::open(region_path).context("failed to open region file")?,
+                        region_x,
+                        region_z,
+                    )
+                    .context("failed to read region file")?
+                    .context("region file is empty")?;
+                    let (_, _, nbt) = xz_nbts
+                        .iter()
+                        .find(|(x, z, _)| *x == chunk_x && *z == chunk_z)
+                        .with_context(|| {
+                            format!(
+                                "missing chunk, all chunk positions: {:#?}",
+                                xz_nbts
+                                    .iter()
+                                    .map(|(x, z, _)| format!("({x}, {z})"))
+                                    .collect::<Vec<_>>()
+                            )
+                        })
+                        .context("chunk not found")?;
+                    io::stdout()
+                        .write_all(nbt)
+                        .context("failed to write to stdout")?;
+                }
+            };
+            Ok(())
+        },
     }
 }

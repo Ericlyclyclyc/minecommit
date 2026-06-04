@@ -2,7 +2,7 @@ mod nbt;
 mod palette;
 
 use anyhow::{Context, Result};
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use simdnbt::borrow::read;
 use simdnbt::{Deserialize, Serialize};
 use std::io::Cursor;
@@ -41,21 +41,9 @@ impl Handler for ChunkRegionHandler {
                     processed.push(key);
                     continue;
                 };
-                {
-                    let mut header_compound = simdnbt::owned::NbtCompound::new();
-                    header_compound.insert(
-                        "TimestampHeader",
-                        simdnbt::owned::NbtTag::ByteArray(timestamp_header.to_vec()),
-                    );
-                    let header_nbt = simdnbt::owned::BaseNbt::new("", header_compound);
-                    let mut header_buf = Vec::with_capacity(4096 + 100);
-                    header_nbt.write(&mut header_buf);
-                    storage.put(&format!("{key}/timestamps"), &header_buf)?;
-                }
-
                 // Each section carries its own local palette, so chunks can be
                 // processed independently in parallel without a global mapping pass.
-                let result = chunks
+                let mut result = chunks
                     .into_par_iter()
                     .map(|(chunk_x, chunk_z, nbt)| {
                         let other_size = nbt.len();
@@ -72,10 +60,31 @@ impl Handler for ChunkRegionHandler {
                         let (other, sections) = split_chunk(nbt).with_context(|| {
                             format!("failed to process chunk ({chunk_x}, {chunk_z}) at file {key}")
                         })?;
+
+                        // Extract InhabitedTime and LastUpdate from other (will store in timestamps)
+                        let name = other.name().to_owned();
+                        let mut other_compound = other.as_compound();
+                        let inhabited_time = other_compound
+                            .remove("InhabitedTime")
+                            .and_then(simdnbt::owned::NbtTag::into_long)
+                            .context("missing 'InhabitedTime' field")?;
+                        let last_update = other_compound
+                            .remove("LastUpdate")
+                            .and_then(simdnbt::owned::NbtTag::into_long)
+                            .context("missing 'LastUpdate' field")?;
+                        let other = simdnbt::owned::BaseNbt::new(name, other_compound);
+
                         let other_dump = dump_nbt(sort_nbt(other), other_size)?;
                         let mut sections_dump = Vec::with_capacity(200 * 1024);
                         sections.to_nbt().write(&mut sections_dump);
-                        Ok(Some((chunk_x, chunk_z, other_dump, sections_dump)))
+                        Ok(Some((
+                            chunk_x,
+                            chunk_z,
+                            other_dump,
+                            sections_dump,
+                            inhabited_time,
+                            last_update,
+                        )))
                     })
                     .collect::<Result<Vec<_>>>()
                     .context("failed to process chunks")?
@@ -83,11 +92,40 @@ impl Handler for ChunkRegionHandler {
                     .flatten()
                     .collect::<Vec<_>>();
 
+                // Sort by (cz, cx) for deterministic ordering matching unflatten glob order
+                result
+                    .sort_unstable_by(|(cx1, cz1, ..), (cx2, cz2, ..)| (cz1, cx1).cmp(&(cz2, cx2)));
+
+                // Build timestamps NBT with header byte array + InhabitedTime/LastUpdate long arrays
+                {
+                    let mut header_compound = simdnbt::owned::NbtCompound::new();
+                    header_compound.insert(
+                        "TimestampHeader",
+                        simdnbt::owned::NbtTag::ByteArray(timestamp_header.to_vec()),
+                    );
+                    header_compound.insert(
+                        "InhabitedTime",
+                        simdnbt::owned::NbtTag::LongArray(
+                            result.iter().map(|(_, _, _, _, it, _)| *it).collect(),
+                        ),
+                    );
+                    header_compound.insert(
+                        "LastUpdate",
+                        simdnbt::owned::NbtTag::LongArray(
+                            result.iter().map(|(_, _, _, _, _, lu)| *lu).collect(),
+                        ),
+                    );
+                    let header_nbt = simdnbt::owned::BaseNbt::new("", header_compound);
+                    let mut header_buf = Vec::with_capacity(4096 + 100);
+                    header_nbt.write(&mut header_buf);
+                    storage.put(&format!("{key}/timestamps"), &header_buf)?;
+                }
+
                 // Write objects
                 storage.put_par(
                     result
                         .iter()
-                        .flat_map(|(chunk_x, chunk_z, other, dump)| {
+                        .flat_map(|(chunk_x, chunk_z, other, dump, ..)| {
                             [
                                 (
                                     format!("{key}/other/c.{chunk_x}.{chunk_z}.nbt"),
@@ -129,6 +167,14 @@ impl Handler for ChunkRegionHandler {
                     .context("missing 'TimestampHeader' in timestamp nbt")?
                     .try_into()
                     .context("timestamp header must be exactly 4096 bytes")?;
+                let inhabited_times: Vec<i64> = ts_compound
+                    .long_array("InhabitedTime")
+                    .context("missing 'InhabitedTime' in timestamp nbt")?
+                    .to_vec();
+                let last_updates: Vec<i64> = ts_compound
+                    .long_array("LastUpdate")
+                    .context("missing 'LastUpdate' in timestamp nbt")?
+                    .to_vec();
 
                 let other_pattern = format!("{region_key}/other/c.*.*.nbt");
 
@@ -155,20 +201,32 @@ impl Handler for ChunkRegionHandler {
                 let dump_data = all_data.split_off(other_keys.len());
                 let nbt_data = all_data;
 
-                let tasks: Vec<(i32, i32, Vec<u8>, Vec<u8>)> = coords
+                let mut tasks: Vec<(i32, i32, Vec<u8>, Vec<u8>)> = coords
                     .into_iter()
                     .zip(nbt_data)
                     .zip(dump_data)
                     .map(|(((cx, cz), nbt), dump)| (cx, cz, nbt, dump))
                     .collect();
 
+                // Sort by (cz, cx) to match flatten order for InhabitedTime/LastUpdate indexing
+                tasks
+                    .sort_unstable_by(|(cx1, cz1, ..), (cx2, cz2, ..)| (cz1, cx1).cmp(&(cz2, cx2)));
+
                 let chunks = tasks
                     .into_par_iter()
-                    .map(|(chunk_x, chunk_z, nbt_data, dump_data)| {
+                    .enumerate()
+                    .map(|(i, (chunk_x, chunk_z, nbt_data, dump_data))| {
                         use simdnbt::borrow::Nbt;
 
-                        let other =
+                        let base =
                             load_nbt(Cursor::new(&nbt_data)).context("failed to load other nbt")?;
+                        // Inject InhabitedTime and LastUpdate back into other
+                        let name = base.name().to_owned();
+                        let mut compound = base.as_compound();
+                        compound.insert("InhabitedTime", inhabited_times[i]);
+                        compound.insert("LastUpdate", last_updates[i]);
+                        let other = simdnbt::owned::BaseNbt::new(name, compound);
+
                         let Nbt::Some(nbt) = read(&mut Cursor::new(dump_data.as_slice()))
                             .context("failed to read sections dump as nbt")?
                         else {

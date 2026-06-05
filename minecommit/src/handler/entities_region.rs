@@ -64,6 +64,7 @@ impl Handler for EntitiesRegionHandler {
                         );
                     }
                     let entities_nbt = simdnbt::owned::BaseNbt::new("", entities_compound);
+                    let entities_nbt = sort_nbt(entities_nbt);
                     let mut entities_buf = Vec::new();
                     entities_nbt.write(&mut entities_buf);
                     storage.put(&format!("{key}/entities.nbt"), &entities_buf)?;

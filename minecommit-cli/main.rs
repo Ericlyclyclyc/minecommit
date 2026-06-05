@@ -167,7 +167,7 @@ fn main() -> Result<(), anyhow::Error> {
                 .context("failed to count git objects")?
                 .total_size_mib();
             log::info!(
-                "Done. Repo total size: {size_after:.2} MiB (up {:+.2}% from {size_before:.2} MiB)",
+                "Done. Repo total size: {size_after:.3} MiB (up {:+.4}% from {size_before:.3} MiB)",
                 (size_after - size_before) / size_before * 100.0
             );
             Ok(())

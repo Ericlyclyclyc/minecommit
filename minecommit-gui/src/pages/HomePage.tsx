@@ -1,9 +1,8 @@
 import { useState } from "react"
 import { Dock } from "@/components/unlumen-ui/dock"
 import {
-  BookDown,
-  BookUp,
-  BookUp2,
+  CloudDownload,
+  CloudUpload,
   HardDriveDownload,
   HardDriveUpload,
 } from "lucide-react"
@@ -278,29 +277,23 @@ export function HomePage() {
 
   const items = [
     {
-      icon: <BookUp2 />,
-      label: "快速提交 / 备份",
-      onClick: () => openLog("commit"),
-      separator: true,
-    },
-    {
-      icon: <BookUp />,
-      label: "备注提交 / 备份",
+      icon: <HardDriveDownload />,
+      label: "提交 / 备份",
       onClick: () => setCommitDialogOpen(true),
     },
     {
-      icon: <BookDown />,
+      icon: <HardDriveUpload />,
       label: "恢复最近提交",
       onClick: () => setRestoreDialogOpen(true),
       separator: true,
     },
     {
-      icon: <HardDriveUpload />,
+      icon: <CloudUpload />,
       label: "上传 / 推送",
       onClick: () => setPushDialogOpen(true),
     },
     {
-      icon: <HardDriveDownload />,
+      icon: <CloudDownload />,
       label: "下载 / 拉取",
       onClick: () => setPullDialogOpen(true),
     },

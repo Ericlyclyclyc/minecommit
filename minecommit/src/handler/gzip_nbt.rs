@@ -63,10 +63,7 @@ impl Handler for GzipNbtHandler {
 
                     // Sort recipe book for player data in level.dat
                     let nbt = {
-                        if glob::Pattern::new("level.dat")
-                            .context("failed to compile glob pattern")?
-                            .matches(&key)
-                        {
+                        if key == "level.dat" || key == "level.dat_old" {
                             let name = nbt.name().to_owned();
                             let mut comp = nbt.as_compound();
                             if let Some(data) = comp.compound_mut("Data")

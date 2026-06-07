@@ -27,7 +27,19 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Button } from "@/components/ui/button"
-import { Trash2, ArrowUpRightIcon, HardDrive } from "lucide-react"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import { useState } from "react"
+import { Trash2, HardDrive } from "lucide-react"
 
 interface Save {
   name: string
@@ -36,7 +48,7 @@ interface Save {
   remoteRepoPath: string
 }
 
-function EmptySave() {
+function EmptySave({ onAddTrack }: { onAddTrack: () => void }) {
   return (
     <Empty>
       <EmptyHeader>
@@ -50,9 +62,92 @@ function EmptySave() {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button>添加跟踪</Button>
+        <Button onClick={onAddTrack}>添加跟踪</Button>
       </EmptyContent>
     </Empty>
+  )
+}
+
+function AddTrackDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const [name, setName] = useState("")
+  const [path, setPath] = useState("")
+  const [localRepoPath, setLocalRepoPath] = useState("")
+  const [remoteRepoPath, setRemoteRepoPath] = useState("")
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    // TODO: 添加跟踪逻辑
+    onOpenChange(false)
+    setName("")
+    setPath("")
+    setRemoteRepoPath("")
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <form onSubmit={handleSubmit}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>添加跟踪</DialogTitle>
+            <DialogDescription>选择一个 Minecraft 存档文件夹</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="save-path">存档路径</FieldLabel>
+              <Input
+                id="save-path"
+                placeholder="/home/user/.minecraft/saves/我的世界"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                required
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="save-name">存档名称</FieldLabel>
+              <Input
+                id="save-name"
+                placeholder="我的世界"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="local-repo-path">本地仓库路径</FieldLabel>
+              <Input
+                id="local-repo-path"
+                placeholder="/home/user/.minecraft/minecommit/我的世界.git"
+                value={localRepoPath}
+                onChange={(e) => setLocalRepoPath(e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="remote-repo-path">
+                远程仓库路径（可选）
+              </FieldLabel>
+              <Input
+                id="remote-repo-path"
+                placeholder="https://git.example.com/我的世界.git"
+                value={remoteRepoPath}
+                onChange={(e) => setRemoteRepoPath(e.target.value)}
+              />
+            </Field>
+          </FieldGroup>
+          <DialogFooter className="mt-6">
+            <DialogClose render={<Button variant="outline" />}>
+              取消
+            </DialogClose>
+            <Button type="submit">跟踪</Button>
+          </DialogFooter>
+        </DialogContent>
+      </form>
+    </Dialog>
   )
 }
 
@@ -84,6 +179,8 @@ const saves: Save[] = [
 ]
 
 export function SaveManagePage() {
+  const [dialogOpen, setDialogOpen] = useState(false)
+
   return (
     <div className="flex w-full flex-col gap-4 p-4">
       <Card>
@@ -93,12 +190,14 @@ export function SaveManagePage() {
               <CardTitle>存档列表</CardTitle>
               <CardDescription>管理 MineCommit 对存档的跟踪</CardDescription>
             </div>
-            {saves.length === 0 || <Button>添加跟踪</Button>}
+            {saves.length === 0 || (
+              <Button onClick={() => setDialogOpen(true)}>添加跟踪</Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
           {saves.length === 0 ? (
-            <EmptySave />
+            <EmptySave onAddTrack={() => setDialogOpen(true)} />
           ) : (
             <Table>
               <TableHeader>
@@ -178,6 +277,7 @@ export function SaveManagePage() {
           )}
         </CardContent>
       </Card>
+      <AddTrackDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   )
 }

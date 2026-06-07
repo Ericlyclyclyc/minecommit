@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom"
+import { NavLink, useNavigate } from "react-router-dom"
 import {
   Sidebar,
   SidebarContent,
@@ -40,6 +40,7 @@ const navItems = allItems.slice(0, -1)
 const settingsItem = allItems.at(-1)
 
 export function AppSidebar() {
+  const navigate = useNavigate()
   const [activeItem, setActiveItem] = useState(navItems[0])
 
   return (
@@ -59,7 +60,7 @@ export function AppSidebar() {
               />
               <DropdownMenuContent className="w-40" align="start">
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/save-manage")}>
                     <Archive />
                     管理
                   </DropdownMenuItem>

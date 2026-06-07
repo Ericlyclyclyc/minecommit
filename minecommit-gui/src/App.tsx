@@ -3,6 +3,7 @@ import { HomePage } from "@/pages/HomePage"
 // import { DashboardPage } from "@/pages/DashboardPage"
 // import { HistoryPage } from "@/pages/HistoryPage"
 import { SettingsPage } from "@/pages/SettingsPage"
+import { SaveManagePage } from "@/pages/SaveManagePage"
 
 export function App() {
   return (
@@ -11,6 +12,7 @@ export function App() {
       {/*<Route path="/dashboard" element={<DashboardPage />} />*/}
       {/*<Route path="/history" element={<HistoryPage />} />*/}
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/save-manage" element={<SaveManagePage />} />
     </Routes>
   )
 }

@@ -15,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -28,6 +29,7 @@ import {
   Settings,
 } from "lucide-react"
 import { useState } from "react"
+import { useSaves } from "@/contexts/saves"
 
 const allItems = [
   { to: "/", label: "主页", icon: House },
@@ -40,6 +42,7 @@ const settingsItem = allItems.at(-1)
 
 export function AppSidebar() {
   const navigate = useNavigate()
+  const { saves } = useSaves()
   const [activeItem, setActiveItem] = useState(navItems[0])
 
   return (
@@ -57,18 +60,26 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 }
               />
-              <DropdownMenuContent className="w-40" align="start">
+              <DropdownMenuContent className="w-auto" align="start">
                 <DropdownMenuGroup>
                   <DropdownMenuItem onClick={() => navigate("/save-manage")}>
                     <Archive />
-                    管理
+                    管理存档
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>世界 1</DropdownMenuItem>
-                  <DropdownMenuItem>世界 2</DropdownMenuItem>
-                  <DropdownMenuItem>世界 3</DropdownMenuItem>
+                  <DropdownMenuLabel>近期存档</DropdownMenuLabel>
+                  {saves.length === 0 ? (
+                    <DropdownMenuItem disabled>暂无存档</DropdownMenuItem>
+                  ) : (
+                    saves.map((save) => (
+                      <DropdownMenuItem key={save.name}>
+                        <HardDrive />
+                        {save.name}
+                      </DropdownMenuItem>
+                    ))
+                  )}
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>

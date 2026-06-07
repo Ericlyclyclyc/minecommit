@@ -38,18 +38,11 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import { Trash2, HardDrive, FolderOpen } from "lucide-react"
 import { invoke } from "@tauri-apps/api/core"
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog"
-
-interface Save {
-  name: string
-  path: string
-  repo_path: string
-  remote_repo_path: string
-  last_access: string
-}
+import { useSaves } from "@/contexts/saves"
 
 function EmptySave({ onAddTrack }: { onAddTrack: () => void }) {
   return (
@@ -270,48 +263,14 @@ function AddTrackDialog({
 }
 
 export function SaveManagePage() {
-  const [saves, setSaves] = useState<Save[]>([])
+  const { saves, loaded, refreshSaves } = useSaves()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-
-  const loadSaves = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError("")
-      const data = await invoke<Save[]>("list_saves")
-      setSaves(data)
-    } catch (err) {
-      setError(String(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    let ignore = false
-    async function fetchData() {
-      try {
-        setLoading(true)
-        setError("")
-        const data = await invoke<Save[]>("list_saves")
-        if (!ignore) setSaves(data)
-      } catch (err) {
-        if (!ignore) setError(String(err))
-      } finally {
-        if (!ignore) setLoading(false)
-      }
-    }
-    fetchData()
-    return () => {
-      ignore = true
-    }
-  }, [])
 
   async function handleDelete(name: string) {
     try {
       await invoke("delete_save", { name })
-      await loadSaves()
+      await refreshSaves()
     } catch (err) {
       setError(String(err))
     }
@@ -333,7 +292,7 @@ export function SaveManagePage() {
         </CardHeader>
         <CardContent>
           {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
-          {loading ? (
+          {!loaded ? (
             <p className="text-sm text-muted-foreground">加载中…</p>
           ) : saves.length === 0 ? (
             <EmptySave onAddTrack={() => setDialogOpen(true)} />
@@ -415,7 +374,7 @@ export function SaveManagePage() {
       <AddTrackDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSaveAdded={loadSaves}
+        onSaveAdded={refreshSaves}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use tauri::Manager;
 use thiserror::Error;
@@ -15,6 +15,14 @@ pub enum AppError {
     DuplicateName(String),
     #[error("Save \"{0}\" not found")]
     SaveNotFound(String),
+    #[error("Invalid path: {0}")]
+    InvalidUTF8(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeriveSaveInfo {
+    pub name: String,
+    pub repo_path: String,
 }
 
 impl Serialize for AppError {
@@ -95,6 +103,57 @@ fn add_save(
 }
 
 #[tauri::command]
+fn derive_save_info(path: String) -> Result<DeriveSaveInfo, AppError> {
+    let canonical = Path::new(&path).canonicalize()?;
+
+    let parts: Vec<&str> = canonical
+        .components()
+        .filter_map(|c| match c {
+            Component::Normal(s) => Some(s.to_str().ok_or_else(|| {
+                AppError::InvalidUTF8(format!("non-UTF8 component in path: {:?}", path))
+            })),
+            _ => None,
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let name = match parts.as_slice() {
+        [.., launcher, ".minecraft", "versions", version, "saves", save_name] => {
+            format!("{launcher} / {version} / {save_name}")
+        }
+        [.., launcher, ".minecraft", "saves", save_name] => format!("{launcher} / {save_name}"),
+        [.., "saves", save_name] => save_name.to_string(),
+        _ => {
+            return Err(AppError::InvalidUTF8(format!(
+                "path has no meaningful segments: {}",
+                path
+            )))
+        }
+    };
+    let repo_path = match parts.as_slice() {
+        [.., _, ".minecraft", "versions", _, "saves", save_name]
+        | [.., _, ".minecraft", "saves", save_name] => {
+            let mut p = canonical.parent().unwrap().parent().unwrap().to_path_buf();
+            p.push("minecommit");
+            p.push(format!("{save_name}.git"));
+            p.to_str().unwrap().to_string()
+        }
+        [.., save_name] => {
+            let mut p = canonical.parent().unwrap().to_path_buf();
+            p.push(format!("{save_name}.git"));
+            p.to_str().unwrap().to_string()
+        }
+        _ => {
+            return Err(AppError::InvalidUTF8(format!(
+                "path has no meaningful segments: {}",
+                path
+            )))
+        }
+    };
+
+    Ok(DeriveSaveInfo { name, repo_path })
+}
+
+#[tauri::command]
 fn delete_save(state: tauri::State<SaveState>, name: String) -> Result<(), AppError> {
     let mut saves = state.saves.lock().unwrap();
     let len_before = saves.len();
@@ -126,7 +185,12 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![list_saves, add_save, delete_save])
+        .invoke_handler(tauri::generate_handler![
+            list_saves,
+            add_save,
+            delete_save,
+            derive_save_info,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

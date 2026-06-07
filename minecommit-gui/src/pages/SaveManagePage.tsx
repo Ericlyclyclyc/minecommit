@@ -70,21 +70,6 @@ function EmptySave({ onAddTrack }: { onAddTrack: () => void }) {
   )
 }
 
-/** Derive a save name from a folder path (e.g. last segment). */
-function deriveNameFromPath(path: string): string {
-  const normalized = path.replace(/\\/g, "/")
-  const parts = normalized.split("/")
-  return parts[parts.length - 1] || ""
-}
-
-/** Derive a reasonable default local repo path from the save path. */
-function deriveRepoPathFromPath(path: string): string {
-  const name = deriveNameFromPath(path)
-  const normalized = path.replace(/\\/g, "/")
-  const parentDir = normalized.split("/").slice(0, -1).join("/")
-  return `${parentDir}/minecommit/${name}.git`
-}
-
 type AddTrackStep = "select" | "confirm"
 
 function AddTrackDialog({
@@ -135,16 +120,20 @@ function AddTrackDialog({
         title: "选择存档文件夹",
       })
       if (selected) {
-        // Pre-fill fields
-        setName(deriveNameFromPath(selected))
+        // Derive fields via backend
+        const info = await invoke<{ name: string; repo_path: string }>(
+          "derive_save_info",
+          { path: selected },
+        )
+        setName(info.name)
         setPath(selected)
-        setLocalRepoPath(deriveRepoPathFromPath(selected))
+        setLocalRepoPath(info.repo_path)
         setRemoteRepoPath("")
         setError("")
         setStep("confirm")
       }
     } catch (err) {
-      console.error("Failed to open folder dialog:", err)
+      setError(String(err))
     } finally {
       setSelecting(false)
     }

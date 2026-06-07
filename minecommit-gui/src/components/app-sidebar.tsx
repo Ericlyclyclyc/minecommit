@@ -24,7 +24,6 @@ import {
   HardDrive,
   // History,
   House,
-  Plus,
   // LayoutDashboard,
   Settings,
 } from "lucide-react"

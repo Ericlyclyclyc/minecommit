@@ -69,9 +69,13 @@ export function SaveManagePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>存档名称</TableHead>
-                <TableHead>存档路径</TableHead>
-                <TableHead className="w-12">
+                <TableHead className="text-muted-foreground">
+                  存档名称
+                </TableHead>
+                <TableHead className="text-muted-foreground">
+                  存档路径
+                </TableHead>
+                <TableHead>
                   <span className="sr-only">操作</span>
                 </TableHead>
               </TableRow>
@@ -79,24 +83,21 @@ export function SaveManagePage() {
             <TableBody>
               {saves.map((save) => (
                 <HoverCard key={save.name}>
-                  <HoverCardTrigger
-                    render={<TableRow className="cursor-pointer" />}
-                  >
-                    <TableCell className="font-medium">{save.name}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {save.path}
-                    </TableCell>
+                  <HoverCardTrigger render={<TableRow />}>
+                    <TableCell className="">{save.name}</TableCell>
+                    <TableCell>{save.path}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="icon-sm"
+                        className="cursor-pointer"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Trash2 />
                       </Button>
                     </TableCell>
                   </HoverCardTrigger>
-                  <HoverCardContent side="right" align="start" className="w-96">
+                  <HoverCardContent align="start" className="w-auto">
                     <div className="flex flex-col gap-3">
                       <div>
                         <p className="text-xs text-muted-foreground">
@@ -124,9 +125,15 @@ export function SaveManagePage() {
                         <p className="text-xs text-muted-foreground">
                           远程仓库路径
                         </p>
-                        <p className="font-mono text-xs break-all">
-                          {save.remoteRepoPath || "（未设置）"}
-                        </p>
+                        {save.remoteRepoPath ? (
+                          <p className="font-mono text-xs break-all">
+                            {save.remoteRepoPath}
+                          </p>
+                        ) : (
+                          <p className="font-mono text-xs break-all text-muted-foreground">
+                            {"（未设置）"}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </HoverCardContent>

@@ -299,8 +299,24 @@ export function SaveManagePage() {
   }, [])
 
   useEffect(() => {
-    loadSaves()
-  }, [loadSaves])
+    let ignore = false
+    async function fetchData() {
+      try {
+        setLoading(true)
+        setError("")
+        const data = await invoke<Save[]>("list_saves")
+        if (!ignore) setSaves(data)
+      } catch (err) {
+        if (!ignore) setError(String(err))
+      } finally {
+        if (!ignore) setLoading(false)
+      }
+    }
+    fetchData()
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   async function handleDelete(name: string) {
     try {

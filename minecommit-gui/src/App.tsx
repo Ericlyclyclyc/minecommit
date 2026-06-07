@@ -1,9 +1,9 @@
 import { Routes, Route } from "react-router-dom"
-import { HomePage } from "@/pages/HomePage"
+import { HomePage } from "@/pages/home"
 // import { DashboardPage } from "@/pages/DashboardPage"
 // import { HistoryPage } from "@/pages/HistoryPage"
-import { SettingsPage } from "@/pages/SettingsPage"
-import { SaveManagePage } from "@/pages/SaveManagePage"
+import { SettingsPage } from "@/pages/settings"
+import { SaveManagePage } from "@/pages/save-manage"
 
 export function App() {
   return (

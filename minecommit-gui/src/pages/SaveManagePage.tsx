@@ -38,14 +38,15 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Trash2, HardDrive } from "lucide-react"
+import { invoke } from "@tauri-apps/api/core"
 
 interface Save {
   name: string
   path: string
-  repoPath: string
-  remoteRepoPath: string
+  repo_path: string
+  remote_repo_path: string
 }
 
 function EmptySave({ onAddTrack }: { onAddTrack: () => void }) {
@@ -71,27 +72,59 @@ function EmptySave({ onAddTrack }: { onAddTrack: () => void }) {
 function AddTrackDialog({
   open,
   onOpenChange,
+  onSaveAdded,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSaveAdded: () => void
 }) {
   const [name, setName] = useState("")
   const [path, setPath] = useState("")
   const [localRepoPath, setLocalRepoPath] = useState("")
   const [remoteRepoPath, setRemoteRepoPath] = useState("")
+  const [error, setError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    // TODO: 添加跟踪逻辑
-    onOpenChange(false)
+  function resetForm() {
     setName("")
     setPath("")
+    setLocalRepoPath("")
     setRemoteRepoPath("")
+    setError("")
+    setSubmitting(false)
+  }
+
+  async function handleSubmit(e: { preventDefault: () => void }) {
+    e.preventDefault()
+    setError("")
+    setSubmitting(true)
+    try {
+      await invoke("add_save", {
+        name,
+        path,
+        repoPath: localRepoPath,
+        remoteRepoPath,
+      })
+      onOpenChange(false)
+      resetForm()
+      onSaveAdded()
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleOpenChange(open: boolean) {
+    if (!open) {
+      resetForm()
+    }
+    onOpenChange(open)
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <form onSubmit={handleSubmit}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <form onSubmit={(e) => e.preventDefault()}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>添加跟踪</DialogTitle>
@@ -99,22 +132,22 @@ function AddTrackDialog({
           </DialogHeader>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="save-path">存档路径</FieldLabel>
-              <Input
-                id="save-path"
-                placeholder="/home/user/.minecraft/saves/我的世界"
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                required
-              />
-            </Field>
-            <Field>
               <FieldLabel htmlFor="save-name">存档名称</FieldLabel>
               <Input
                 id="save-name"
                 placeholder="我的世界"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="save-path">存档路径</FieldLabel>
+              <Input
+                id="save-path"
+                placeholder="/home/user/.minecraft/saves/我的世界"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
                 required
               />
             </Field>
@@ -138,12 +171,21 @@ function AddTrackDialog({
                 onChange={(e) => setRemoteRepoPath(e.target.value)}
               />
             </Field>
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
           </FieldGroup>
           <DialogFooter className="mt-6">
             <DialogClose render={<Button variant="outline" />}>
               取消
             </DialogClose>
-            <Button type="submit">跟踪</Button>
+            <Button
+              type="button"
+              disabled={submitting}
+              onClick={handleSubmit}
+            >
+              {submitting ? "添加中…" : "跟踪"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </form>
@@ -151,35 +193,37 @@ function AddTrackDialog({
   )
 }
 
-const saves: Save[] = [
-  // {
-  //   name: "世界1",
-  //   path: "/home/user/.minecraft/saves/世界1",
-  //   repoPath: "/home/user/.minecraft/saves/世界1/.git",
-  //   remoteRepoPath: "https://github.com/user/mc-world1.git",
-  // },
-  // {
-  //   name: "创造测试",
-  //   path: "/home/user/.minecraft/saves/创造测试",
-  //   repoPath: "/home/user/.minecraft/saves/创造测试/.git",
-  //   remoteRepoPath: "https://github.com/user/mc-creative.git",
-  // },
-  // {
-  //   name: "红石实验室",
-  //   path: "/home/user/.minecraft/saves/红石实验室",
-  //   repoPath: "/home/user/.minecraft/saves/红石实验室/.git",
-  //   remoteRepoPath: "https://github.com/user/mc-redstone.git",
-  // },
-  // {
-  //   name: "生存存档",
-  //   path: "/home/user/.minecraft/saves/生存存档",
-  //   repoPath: "/home/user/.minecraft/saves/生存存档/.git",
-  //   remoteRepoPath: "",
-  // },
-]
-
 export function SaveManagePage() {
+  const [saves, setSaves] = useState<Save[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  const loadSaves = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError("")
+      const data = await invoke<Save[]>("list_saves")
+      setSaves(data)
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSaves()
+  }, [loadSaves])
+
+  async function handleDelete(name: string) {
+    try {
+      await invoke("delete_save", { name })
+      await loadSaves()
+    } catch (err) {
+      setError(String(err))
+    }
+  }
 
   return (
     <div className="flex w-full flex-col gap-4 p-4">
@@ -190,13 +234,18 @@ export function SaveManagePage() {
               <CardTitle>存档列表</CardTitle>
               <CardDescription>管理 MineCommit 对存档的跟踪</CardDescription>
             </div>
-            {saves.length === 0 || (
+            {saves.length > 0 && (
               <Button onClick={() => setDialogOpen(true)}>添加跟踪</Button>
             )}
           </div>
         </CardHeader>
         <CardContent>
-          {saves.length === 0 ? (
+          {error && (
+            <p className="mb-4 text-sm text-destructive">{error}</p>
+          )}
+          {loading ? (
+            <p className="text-sm text-muted-foreground">加载中…</p>
+          ) : saves.length === 0 ? (
             <EmptySave onAddTrack={() => setDialogOpen(true)} />
           ) : (
             <Table>
@@ -224,7 +273,10 @@ export function SaveManagePage() {
                           variant="ghost"
                           size="icon-sm"
                           className="cursor-pointer"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(save.name)
+                          }}
                         >
                           <Trash2 />
                         </Button>
@@ -251,16 +303,16 @@ export function SaveManagePage() {
                             仓库路径
                           </p>
                           <p className="font-mono text-xs break-all">
-                            {save.repoPath}
+                            {save.repo_path}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">
                             远程仓库路径
                           </p>
-                          {save.remoteRepoPath ? (
+                          {save.remote_repo_path ? (
                             <p className="font-mono text-xs break-all">
-                              {save.remoteRepoPath}
+                              {save.remote_repo_path}
                             </p>
                           ) : (
                             <p className="font-mono text-xs break-all text-muted-foreground">
@@ -277,7 +329,11 @@ export function SaveManagePage() {
           )}
         </CardContent>
       </Card>
-      <AddTrackDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <AddTrackDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSaveAdded={loadSaves}
+      />
     </div>
   )
 }

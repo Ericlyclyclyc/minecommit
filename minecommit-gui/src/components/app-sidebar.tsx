@@ -8,7 +8,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -28,7 +27,6 @@ import {
   // LayoutDashboard,
   Settings,
 } from "lucide-react"
-import { useState } from "react"
 import { useSaves } from "@/contexts/saves"
 
 const allItems = [
@@ -38,12 +36,10 @@ const allItems = [
   { to: "/settings", label: "设置", icon: Settings },
 ]
 const navItems = allItems.slice(0, -1)
-const settingsItem = allItems.at(-1)
 
 export function AppSidebar() {
   const navigate = useNavigate()
   const { saves } = useSaves()
-  const [activeItem, setActiveItem] = useState(navItems[0])
 
   return (
     <Sidebar collapsible="icon">
@@ -91,11 +87,7 @@ export function AppSidebar() {
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.to}>
-                <SidebarMenuButton
-                  render={<NavLink to={item.to} end />}
-                  isActive={item.to === activeItem.to}
-                  onClick={() => setActiveItem(item)}
-                >
+                <SidebarMenuButton render={<NavLink to={item.to} end />}>
                   <item.icon />
                   {item.label}
                 </SidebarMenuButton>
@@ -107,18 +99,13 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              render={<NavLink to="/settings" />}
-              isActive={activeItem.to === "/settings"}
-              onClick={() => setActiveItem(settingsItem || navItems[0])}
-            >
+            <SidebarMenuButton render={<NavLink to="/settings" />}>
               <Settings />
               设置
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   )
 }

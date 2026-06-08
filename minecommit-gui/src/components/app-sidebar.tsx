@@ -78,7 +78,9 @@ export function AppSidebar() {
                         if (save) setSelectedSave(save)
                       }}
                     >
-                      {saves.map((save) => (
+                      {[...saves]
+                        .sort((a, b) => b.last_access.localeCompare(a.last_access))
+                        .map((save) => (
                         <DropdownMenuRadioItem key={save.name} value={save.name}>
                           {save.name}
                         </DropdownMenuRadioItem>

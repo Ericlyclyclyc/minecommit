@@ -54,6 +54,7 @@ function CommitDialog({
               id="message"
               name="message"
               placeholder="例如：刷怪塔完工"
+              defaultValue={"-"}
             />
           </Field>
           <Field>

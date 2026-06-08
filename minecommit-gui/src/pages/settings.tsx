@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useCommitAuthor } from "@/contexts/commit-author"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,11 +17,6 @@ export function SettingsPage() {
   const [email, setEmail] = useState(author.email)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    setName(author.name)
-    setEmail(author.email)
-  }, [author])
 
   const handleSave = async () => {
     setSaving(true)
@@ -45,7 +40,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 p-6">
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-6 p-6" key={`${author.name}-${author.email}`}>
       <h1 className="text-2xl font-bold">设置</h1>
 
       <Card>
@@ -61,7 +56,7 @@ export function SettingsPage() {
             <Input
               id="author-name"
               placeholder="例如: Steve"
-              value={name}
+              defaultValue={author.name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
@@ -70,7 +65,7 @@ export function SettingsPage() {
             <Input
               id="author-email"
               placeholder="例如: steve@example.com"
-              value={email}
+              defaultValue={author.email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>

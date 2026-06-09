@@ -4,7 +4,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -36,9 +35,6 @@ function RollingLogContent({
     <>
       <AlertDialogHeader>
         <AlertDialogTitle>运行日志</AlertDialogTitle>
-        <AlertDialogDescription>
-          {finished ? "运行结束" : "请耐心等待运行结束..."}
-        </AlertDialogDescription>
       </AlertDialogHeader>
       <pre
         ref={preRef}
@@ -48,9 +44,11 @@ function RollingLogContent({
       </pre>
       <AlertDialogFooter>
         <AlertDialogCancel disabled={!finished}>关闭</AlertDialogCancel>
-        <AlertDialogAction variant="destructive" onClick={onForceStop}>
-          强制停止
-        </AlertDialogAction>
+        {!finished && (
+          <AlertDialogAction variant="destructive" onClick={onForceStop}>
+            强制停止
+          </AlertDialogAction>
+        )}
       </AlertDialogFooter>
     </>
   )

@@ -1,5 +1,5 @@
 import * as React from "react"
-import type { LogEntry } from "@/components/log-viewer"
+import type { LogEntry, LogLine } from "@/components/log-viewer"
 import { DEFAULT_LEVEL_COLORS, LEVEL_LABELS } from "@/components/log-viewer"
 import {
   AlertDialog,
@@ -32,23 +32,26 @@ function formatTimestamp(): string {
   })}.${ms}`
 }
 
-function toLogEntries(lines: string[] | undefined): LogEntry[] {
+/** Normalise a backend LogLine (wire format) into a display LogEntry. */
+function toLogEntry(raw: LogLine): LogEntry {
+  const lower = raw.level.toLowerCase()
+  let level: LogEntry["level"]
+  if (lower === "error") level = "error"
+  else if (lower === "warn" || lower === "warning") level = "warn"
+  else if (lower === "debug") level = "debug"
+  else if (lower === "trace") level = "verbose"
+  else level = "info"
+
+  return {
+    level,
+    message: raw.message,
+    timestamp: new Date().toISOString(),
+  }
+}
+
+function toLogEntries(lines: LogLine[] | undefined): LogEntry[] {
   if (!lines) return []
-  const now = new Date().toISOString()
-  return lines.map((line) => {
-    const lower = line.toLowerCase()
-    const isError =
-      lower.includes("error") ||
-      lower.includes("fail") ||
-      lower.includes("fatal") ||
-      lower.startsWith("error:") ||
-      lower.startsWith("fatal:")
-    return {
-      level: isError ? ("error" as const) : ("info" as const),
-      message: line,
-      timestamp: now,
-    }
-  })
+  return lines.map(toLogEntry)
 }
 
 function RollingLogContent({
@@ -58,7 +61,7 @@ function RollingLogContent({
   onForceStop,
 }: {
   operation: Operation
-  externalLines?: string[]
+  externalLines?: LogLine[]
   externalFinished?: boolean
   onForceStop?: () => void
 }) {
@@ -197,7 +200,7 @@ export function RollingLogDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   operation: Operation
-  logs?: string[]
+  logs?: LogLine[]
   finished?: boolean
   onForceStop?: () => void
 }) {

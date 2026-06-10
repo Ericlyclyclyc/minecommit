@@ -28,6 +28,12 @@ export interface LogEntry {
   timestamp?: string
 }
 
+/** Wire format emitted by the backend (Rust `LogLine` struct). */
+export interface LogLine {
+  level: string
+  message: string
+}
+
 /** Per-level color classes. Each key is optional — omitted levels use defaults. */
 export type LevelColors = {
   /** CSS class for the level label text (e.g. "text-rose-500 dark:text-rose-400"). */

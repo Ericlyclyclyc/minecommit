@@ -64,8 +64,14 @@ pub struct CommitAuthor {
 
 static LOGGER: CaptureLogger = CaptureLogger { lines: Mutex::new(Vec::new()) };
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogLine {
+    level: String,
+    message: String,
+}
+
 struct CaptureLogger {
-    lines: Mutex<Vec<String>>,
+    lines: Mutex<Vec<LogLine>>,
 }
 
 impl Log for CaptureLogger {
@@ -75,8 +81,11 @@ impl Log for CaptureLogger {
 
     fn log(&self, record: &Record) {
         if let Ok(mut lines) = self.lines.lock() {
-            let line = format!("{} {}", record.level(), record.args());
-            lines.push(line);
+            let entry = LogLine {
+                level: record.level().to_string(),
+                message: record.args().to_string(),
+            };
+            lines.push(entry);
         }
     }
 
@@ -89,7 +98,7 @@ fn init_logger() {
     log::set_max_level(LevelFilter::Info);
 }
 
-fn take_logs() -> Vec<String> {
+fn take_logs() -> Vec<LogLine> {
     LOGGER.lines.lock().unwrap_or_else(|e| e.into_inner()).drain(..).collect()
 }
 
@@ -98,7 +107,7 @@ fn take_logs() -> Vec<String> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformCommitResult {
     pub success: bool,
-    pub logs: Vec<String>,
+    pub logs: Vec<LogLine>,
     pub error: Option<String>,
     pub size_before_mib: Option<f64>,
     pub size_after_mib: Option<f64>,
@@ -128,15 +137,15 @@ async fn perform_commit(
     let log_task = tauri::async_runtime::spawn_blocking(move || {
         while running_clone.load(Ordering::Relaxed) {
             let logs = take_logs();
-            for line in &logs {
-                let _ = app_clone.emit("commit-log", line);
+            for entry in &logs {
+                let _ = app_clone.emit("commit-log", entry);
             }
             std::thread::sleep(Duration::from_millis(50));
         }
         // Drain remaining logs after commit finishes
         let logs = take_logs();
-        for line in &logs {
-            let _ = app_clone.emit("commit-log", line);
+        for entry in &logs {
+            let _ = app_clone.emit("commit-log", entry);
         }
     });
 

@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { RollingLogDialog, type Operation } from "@/components/rolling-log"
+import type { LogLine } from "@/components/log-viewer"
 
 function CommitDialog({
   open,
@@ -357,7 +358,7 @@ export function HomePage() {
   const [pullDialogOpen, setPullDialogOpen] = useState(false)
   const [logDialogOpen, setLogDialogOpen] = useState(false)
   const [operation, setOperation] = useState<Operation>("commit")
-  const [commitLogs, setCommitLogs] = useState<string[]>([])
+  const [commitLogs, setCommitLogs] = useState<LogLine[]>([])
   const [commitFinished, setCommitFinished] = useState(false)
   const unlistenRefs = useRef<Array<() => void>>([])
 
@@ -369,7 +370,7 @@ export function HomePage() {
     }
   }, [logDialogOpen])
 
-  const openLog = (op: Operation, logs?: string[], finished?: boolean) => {
+  const openLog = (op: Operation, logs?: LogLine[], finished?: boolean) => {
     setOperation(op)
     if (logs !== undefined) setCommitLogs(logs)
     if (finished !== undefined) setCommitFinished(finished)
@@ -386,7 +387,7 @@ export function HomePage() {
     unlistenRefs.current.forEach((fn) => fn())
     unlistenRefs.current = []
 
-    const unlisten1 = await listen<string>("commit-log", (event) => {
+    const unlisten1 = await listen<LogLine>("commit-log", (event) => {
       setCommitLogs((prev) => [...prev, event.payload])
     })
     const unlisten2 = await listen("commit-finished", () => {

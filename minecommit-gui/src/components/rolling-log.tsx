@@ -71,11 +71,24 @@ function RollingLogContent({
   const [isAtBottom, setIsAtBottom] = React.useState(true)
   const [copied, setCopied] = React.useState(false)
 
+  const prevFinishedRef = React.useRef(finished)
+
   // auto-scroll
   React.useEffect(() => {
-    if (finished || !isAtBottom) return
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+
+    // When the operation just finished, force a scroll to bottom so the user
+    // sees the final log lines (finished may flip in the same render as the
+    // last entry, which would otherwise be skipped).
+    const justFinished = finished && !prevFinishedRef.current
+    prevFinishedRef.current = finished
+
+    if (justFinished || isAtBottom) {
+      requestAnimationFrame(() => {
+        if (el) el.scrollTop = el.scrollHeight
+      })
+    }
   }, [entries.length, finished, isAtBottom])
 
   const handleScroll = React.useCallback(() => {
@@ -160,15 +173,22 @@ function RollingLogContent({
             const colors = DEFAULT_LEVEL_COLORS[entry.level]
             return (
               <div key={i} className="flex">
-                <span className="text-muted-foreground/60">
-                  {formatTimestamp()}
+                <span className="shrink-0 text-muted-foreground/60">
+                  {entry.timestamp
+                    ? new Date(entry.timestamp).toLocaleTimeString("en-US", {
+                        hour12: false,
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })
+                    : formatTimestamp()}
                 </span>
                 &nbsp;
-                <span className={cn("w-[3ch] font-semibold", colors.text)}>
+                <span className={cn("w-[3ch] shrink-0 font-semibold", colors.text)}>
                   {LEVEL_LABELS[entry.level]}
                 </span>
                 &nbsp;
-                <span className="break-all whitespace-pre-wrap [font-variant-ligatures:none]">
+                <span className="min-w-0 break-all whitespace-pre-wrap [font-variant-ligatures:none]">
                   {entry.message}
                 </span>
               </div>

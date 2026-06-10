@@ -141,13 +141,24 @@ function useCopy() {
 function useAutoScroll(entries: LogEntry[], enabled: boolean) {
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const [isAtBottom, setIsAtBottom] = React.useState(true)
+  const prevEnabledRef = React.useRef(enabled)
 
   React.useEffect(() => {
-    if (!enabled || !isAtBottom) return
     const el = scrollRef.current
-    if (el) {
-      el.scrollTop = el.scrollHeight
-    }
+    if (!el) return
+
+    // When the user re-enables auto-scroll (unpauses), force a scroll to
+    // bottom so following resumes immediately even if they scrolled up while
+    // paused.
+    const justEnabled = enabled && !prevEnabledRef.current
+    prevEnabledRef.current = enabled
+
+    if (!enabled) return
+    if (!justEnabled && !isAtBottom) return
+
+    requestAnimationFrame(() => {
+      if (el) el.scrollTop = el.scrollHeight
+    })
   }, [entries.length, enabled, isAtBottom])
 
   const handleScroll = React.useCallback(() => {

@@ -53,8 +53,7 @@ pub struct Save {
     pub default_branch: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CommitAuthor {
     pub name: String,
     pub email: String,
@@ -62,7 +61,9 @@ pub struct CommitAuthor {
 
 // ─── Logger for capturing commit logs ───────────────────────────────────────
 
-static LOGGER: CaptureLogger = CaptureLogger { lines: Mutex::new(Vec::new()) };
+static LOGGER: CaptureLogger = CaptureLogger {
+    lines: Mutex::new(Vec::new()),
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogLine {
@@ -99,7 +100,12 @@ fn init_logger() {
 }
 
 fn take_logs() -> Vec<LogLine> {
-    LOGGER.lines.lock().unwrap_or_else(|e| e.into_inner()).drain(..).collect()
+    LOGGER
+        .lines
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .drain(..)
+        .collect()
 }
 
 // ─── Tauri commands ─────────────────────────────────────────────────────────
@@ -446,7 +452,12 @@ fn access_save(state: tauri::State<AppState>, name: String) -> Result<(), AppErr
 #[tauri::command]
 fn list_branches(repo_path: String) -> Result<Vec<String>, String> {
     let output = Command::new("git")
-        .args(["--git-dir", &repo_path, "branch", "--format=%(refname:short)"])
+        .args([
+            "--git-dir",
+            &repo_path,
+            "branch",
+            "--format=%(refname:short)",
+        ])
         .output()
         .map_err(|e| format!("Failed to list branches: {}", e))?;
 
@@ -467,8 +478,8 @@ fn list_branches(repo_path: String) -> Result<Vec<String>, String> {
 #[tauri::command]
 fn get_head_ref(repo_path: String) -> Result<String, String> {
     let head_path = Path::new(&repo_path).join("HEAD");
-    let content = fs::read_to_string(&head_path)
-        .map_err(|e| format!("Failed to read HEAD file: {}", e))?;
+    let content =
+        fs::read_to_string(&head_path).map_err(|e| format!("Failed to read HEAD file: {}", e))?;
 
     // HEAD file content is like "ref: refs/heads/main\n"
     let trimmed = content.trim();

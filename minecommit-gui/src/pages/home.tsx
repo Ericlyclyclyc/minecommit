@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select"
 import { RollingLogDialog, type Operation } from "@/components/rolling-log"
 import type { LogLine } from "@/components/log-viewer"
+import { SaveHoverCard } from "@/components/save-hover-card"
 
 function CommitDialog({
   open,
@@ -209,17 +210,9 @@ function RestoreDialog({
           </DialogDescription>
         </DialogHeader>
         {selectedSave && (
-          <ul className="ml-6 list-disc [&>li]:mt-2">
-            <li>
-              <span>存档</span>: {selectedSave.name}
-            </li>
-            <li>
-              <span>路径</span>: {selectedSave.path}
-            </li>
-            <li>
-              <span>仓库</span>: {selectedSave.repo_path}
-            </li>
-          </ul>
+          <SaveHoverCard save={selectedSave}>
+            <Button variant="link">{selectedSave.name}</Button>
+          </SaveHoverCard>
         )}
         <DialogFooter>
           <DialogClose

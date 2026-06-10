@@ -21,8 +21,8 @@ const OPERATION_LABELS: Record<Operation, string> = {
   pull: "拉取",
 }
 
-function formatTimestamp(): string {
-  const d = new Date()
+function formatTimestamp(iso?: string): string {
+  const d = iso ? new Date(iso) : new Date()
   const ms = d.getMilliseconds().toString().padStart(3, "0")
   return `${d.toLocaleTimeString("en-US", {
     hour12: false,
@@ -49,9 +49,23 @@ function toLogEntry(raw: LogLine): LogEntry {
   }
 }
 
-function toLogEntries(lines: LogLine[] | undefined): LogEntry[] {
-  if (!lines) return []
-  return lines.map(toLogEntry)
+/**
+ * Derive display entries from wire-format lines, preserving timestamps of
+ * previously seen entries so they don't change on every render.
+ */
+function useStableEntries(lines: LogLine[] | undefined): LogEntry[] {
+  const entriesRef = React.useRef<LogEntry[]>([])
+  const src = lines ?? []
+
+  // Reset when the array shrinks (e.g. new operation starts)
+  if (src.length < entriesRef.current.length) {
+    entriesRef.current = src.map(toLogEntry)
+  } else if (src.length > entriesRef.current.length) {
+    const fresh = src.slice(entriesRef.current.length).map(toLogEntry)
+    entriesRef.current = [...entriesRef.current, ...fresh]
+  }
+
+  return entriesRef.current
 }
 
 function RollingLogContent({
@@ -66,7 +80,7 @@ function RollingLogContent({
   onForceStop?: () => void
 }) {
   const finished = externalFinished ?? false
-  const entries = toLogEntries(externalLines)
+  const entries = useStableEntries(externalLines)
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const [isAtBottom, setIsAtBottom] = React.useState(true)
   const [copied, setCopied] = React.useState(false)
@@ -111,7 +125,7 @@ function RollingLogContent({
   const handleCopy = React.useCallback(async () => {
     const text = entries
       .map(
-        (e) => `[${formatTimestamp()}] [${LEVEL_LABELS[e.level]}] ${e.message}`
+        (e) => `[${formatTimestamp(e.timestamp)}] [${LEVEL_LABELS[e.level]}] ${e.message}`
       )
       .join("\n")
     try {
@@ -126,7 +140,7 @@ function RollingLogContent({
   const handleDownload = React.useCallback(() => {
     const text = entries
       .map(
-        (e) => `[${formatTimestamp()}] [${LEVEL_LABELS[e.level]}] ${e.message}`
+        (e) => `[${formatTimestamp(e.timestamp)}] [${LEVEL_LABELS[e.level]}] ${e.message}`
       )
       .join("\n")
     const blob = new Blob([text], { type: "text/plain" })

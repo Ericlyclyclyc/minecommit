@@ -360,7 +360,8 @@ async fn perform_restore(
 
         log::info!("Restoring save from HEAD...");
 
-        match Config::new(save_dir_path, git_dir_path, vec![], vec![]).checkout("HEAD".to_string()) {
+        match Config::new(save_dir_path, git_dir_path, vec![], vec![]).checkout("HEAD".to_string())
+        {
             Ok(()) => {
                 log::info!("Restore completed successfully");
                 PerformRestoreResult {
@@ -773,6 +774,15 @@ fn get_head_ref(repo_path: String) -> Result<String, String> {
 #[tauri::command]
 fn derive_save_info(path: String) -> Result<DeriveSaveInfo, AppError> {
     let canonical = Path::new(&path).canonicalize()?;
+    #[cfg(target_os = "windows")]
+    let canonical = {
+        // On Windows, std::fs::canonicalize() prepends \\?\ (verbatim prefix).
+        // Strip it so the derived repo_path is user-readable.
+        let canonical_str = canonical
+            .to_str()
+            .ok_or_else(|| AppError::InvalidUTF8(format!("non-UTF8 path: {:?}", canonical)))?;
+        PathBuf::from(canonical_str.strip_prefix(r"\\?\").unwrap_or(canonical_str))
+    };
 
     let parts: Vec<&str> = canonical
         .components()

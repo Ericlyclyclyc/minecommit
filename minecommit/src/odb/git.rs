@@ -50,7 +50,17 @@ impl LocalGitOdb {
     /// their underlying commit objects.
     ///
     /// Returns the sha1 of the new commit.
-    pub fn commit(self, parents: &[impl AsRef<str>], message: &str) -> Result<String> {
+    ///
+    /// When `author_name` and `author_email` are both `Some`, the
+    /// `GIT_AUTHOR_*` and `GIT_COMMITTER_*` environment variables are set
+    /// on the `git commit-tree` process.
+    pub fn commit(
+        self,
+        parents: &[impl AsRef<str>],
+        message: &str,
+        author_name: Option<&str>,
+        author_email: Option<&str>,
+    ) -> Result<String> {
         log::info!("Building Git tree objects");
         let tree_sha = build_tree(self.repo.git_dir(), &self.pending, "")?;
 
@@ -60,6 +70,12 @@ impl LocalGitOdb {
             cmd.arg("-p").arg(&format!("{}^0", parent.as_ref()));
         }
         cmd.arg("-m").arg(message);
+        if let (Some(name), Some(email)) = (author_name, author_email) {
+            cmd.env("GIT_AUTHOR_NAME", name)
+                .env("GIT_AUTHOR_EMAIL", email)
+                .env("GIT_COMMITTER_NAME", name)
+                .env("GIT_COMMITTER_EMAIL", email);
+        }
 
         let commit = exec(cmd, None)
             .context("failed to run commit-tree")?
@@ -274,7 +290,7 @@ mod tests {
 
         let data = b"hello git odb".to_vec();
         odb.put("src/hello.txt", &data).unwrap();
-        let commit_sha = odb.commit(&[] as &[&str], "initial").unwrap();
+        let commit_sha = odb.commit(&[] as &[&str], "initial", None, None).unwrap();
         assert_eq!(commit_sha.len(), 40);
 
         let odb = LocalGitOdb::from_commit(repo.path().to_path_buf(), commit_sha).unwrap();
@@ -290,7 +306,7 @@ mod tests {
         odb.put("a/x.rs", &b"fn x(){}".to_vec()).unwrap();
         odb.put("a/y.rs", &b"fn y(){}".to_vec()).unwrap();
         odb.put("b/z.md", &b"# Z".to_vec()).unwrap();
-        let commit_sha = odb.commit(&[] as &[&str], "add files").unwrap();
+        let commit_sha = odb.commit(&[] as &[&str], "add files", None, None).unwrap();
 
         let odb = LocalGitOdb::from_commit(repo.path().to_path_buf(), commit_sha).unwrap();
         let mut matches = odb.glob("a/*.rs").unwrap();
@@ -304,12 +320,12 @@ mod tests {
         let mut odb = LocalGitOdb::from_commit(repo.path().to_path_buf(), String::new()).unwrap();
 
         odb.put("a.txt", &b"v1".to_vec()).unwrap();
-        let first = odb.commit(&[] as &[&str], "first").unwrap();
+        let first = odb.commit(&[] as &[&str], "first", None, None).unwrap();
 
         // Second commit only puts b.txt — a.txt is NOT inherited
         let mut odb = LocalGitOdb::from_commit(repo.path().to_path_buf(), first.clone()).unwrap();
         odb.put("b.txt", &b"v2".to_vec()).unwrap();
-        let second = odb.commit(&[&first], "second").unwrap();
+        let second = odb.commit(&[&first], "second", None, None).unwrap();
 
         // second commit's tree contains only b.txt
         let files: Vec<String> = String::from_utf8(

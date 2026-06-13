@@ -145,7 +145,7 @@ fn main() -> Result<(), anyhow::Error> {
                 extra_patterns,
                 ignore_patterns,
             )
-            .commit(parents, &message, Some(r#ref))?;
+            .commit(parents, &message, Some(r#ref), None, None)?;
             if !unprocessed.is_empty() {
                 for item in &unprocessed {
                     log::error!("Skipped file: {item}");

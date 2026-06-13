@@ -37,7 +37,7 @@ function CommitDialog({
   onOpenChange: (open: boolean) => void
   onCommitStart: () => void
 }) {
-  const { author, setAuthor } = useCommitAuthor()
+  const { author } = useCommitAuthor()
   const { selectedSave } = useSaves()
   const [committing, setCommitting] = useState(false)
   const [message, setMessage] = useState("-")
@@ -53,15 +53,8 @@ function CommitDialog({
     setCommitting(true)
 
     const finalMessage = message || "-"
-
-    // Save author info if changed
-    if (name && (name !== author.name || email !== author.email)) {
-      try {
-        await setAuthor(name, email)
-      } catch {
-        // ignore
-      }
-    }
+    const authorName = name || ""
+    const authorEmail = email || ""
 
     // Open log dialog and close commit dialog immediately
     onOpenChange(false)
@@ -72,6 +65,8 @@ function CommitDialog({
       gitDir: selectedSave.repo_path,
       branch,
       message: finalMessage,
+      authorName,
+      authorEmail,
       extraPatterns: [],
       ignorePatterns: [],
       useRepack: true,
@@ -93,9 +88,6 @@ function CommitDialog({
     message,
     name,
     email,
-    author.name,
-    author.email,
-    setAuthor,
     branch,
     onCommitStart,
     onOpenChange,

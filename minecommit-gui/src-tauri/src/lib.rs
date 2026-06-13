@@ -128,6 +128,8 @@ async fn perform_commit(
     git_dir: String,
     branch: String,
     message: String,
+    author_name: String,
+    author_email: String,
     extra_patterns: Vec<String>,
     ignore_patterns: Vec<String>,
     use_repack: bool,
@@ -190,14 +192,21 @@ async fn perform_commit(
         };
 
         // 3. Run the commit
+        let a_name: Option<&str> = if author_name.is_empty() { None } else { Some(&author_name) };
+        let a_email: Option<&str> = if author_email.is_empty() { None } else { Some(&author_email) };
         let unprocessed = match Config::new(
             save_dir_path.clone(),
             git_dir_path.clone(),
             extra_patterns,
             ignore_patterns,
         )
-        .commit(parents, &message, Some(r#ref))
-        {
+        .commit(
+            parents,
+            &message,
+            Some(r#ref),
+            a_name,
+            a_email,
+        ) {
             Ok(u) => u,
             Err(e) => {
                 let msg = format!("{e:#}");
@@ -267,6 +276,18 @@ async fn perform_commit(
             );
         } else {
             log::info!("Done. Total size: {size_after:.3} MiB");
+        }
+
+        // 7. Persist author info to git global config
+        if !author_name.is_empty() {
+            let _ = Command::new("git")
+                .args(["config", "--global", "user.name", &author_name])
+                .output();
+        }
+        if !author_email.is_empty() {
+            let _ = Command::new("git")
+                .args(["config", "--global", "user.email", &author_email])
+                .output();
         }
 
         PerformCommitResult {
@@ -613,7 +634,6 @@ fn init_bare_repo(repo_path: String, default_branch: String) -> Result<(), Strin
 
 struct AppState {
     saves: Mutex<Vec<Save>>,
-    commit_author: Mutex<CommitAuthor>,
     data_dir: PathBuf,
 }
 
@@ -621,9 +641,6 @@ fn saves_file_path(data_dir: &Path) -> PathBuf {
     data_dir.join("saves.json")
 }
 
-fn commit_author_file_path(data_dir: &Path) -> PathBuf {
-    data_dir.join("commit_author.json")
-}
 
 fn load_saves(data_dir: &PathBuf) -> Result<Vec<Save>, AppError> {
     let path = saves_file_path(data_dir);
@@ -645,24 +662,23 @@ fn save_saves(data_dir: &PathBuf, saves: &[Save]) -> Result<(), AppError> {
     Ok(())
 }
 
-fn load_commit_author(data_dir: &Path) -> CommitAuthor {
-    let path = commit_author_file_path(data_dir);
-    if path.exists() {
-        fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
-    } else {
-        CommitAuthor::default()
-    }
-}
-
-fn save_commit_author(data_dir: &PathBuf, author: &CommitAuthor) -> Result<(), AppError> {
-    let path = commit_author_file_path(data_dir);
-    fs::create_dir_all(data_dir)?;
-    let content = serde_json::to_string_pretty(author)?;
-    fs::write(&path, content)?;
-    Ok(())
+#[tauri::command]
+fn get_git_author() -> CommitAuthor {
+    let name = Command::new("git")
+        .args(["config", "--global", "user.name"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+    let email = Command::new("git")
+        .args(["config", "--global", "user.email"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
+    CommitAuthor { name, email }
 }
 
 #[tauri::command]
@@ -670,21 +686,18 @@ fn list_saves(state: tauri::State<AppState>) -> Vec<Save> {
     state.saves.lock().unwrap().clone()
 }
 
-#[tauri::command]
-fn get_commit_author(state: tauri::State<AppState>) -> CommitAuthor {
-    state.commit_author.lock().unwrap().clone()
-}
 
 #[tauri::command]
-fn set_commit_author(
-    state: tauri::State<AppState>,
-    name: String,
-    email: String,
-) -> Result<CommitAuthor, AppError> {
-    let author = CommitAuthor { name, email };
-    save_commit_author(&state.data_dir, &author)?;
-    *state.commit_author.lock().unwrap() = author.clone();
-    Ok(author)
+fn set_git_author(name: String, email: String) -> Result<CommitAuthor, AppError> {
+    Command::new("git")
+        .args(["config", "--global", "user.name", &name])
+        .output()
+        .map_err(|e| AppError::Io(e))?;
+    Command::new("git")
+        .args(["config", "--global", "user.email", &email])
+        .output()
+        .map_err(|e| AppError::Io(e))?;
+    Ok(CommitAuthor { name, email })
 }
 
 #[tauri::command]
@@ -873,11 +886,9 @@ pub fn run() {
                 .expect("failed to resolve app data dir");
 
             let saves = load_saves(&data_dir)?;
-            let commit_author = load_commit_author(&data_dir);
 
             app.manage(AppState {
                 saves: Mutex::new(saves),
-                commit_author: Mutex::new(commit_author),
                 data_dir,
             });
 
@@ -893,8 +904,8 @@ pub fn run() {
             init_bare_repo,
             list_branches,
             get_head_ref,
-            get_commit_author,
-            set_commit_author,
+            get_git_author,
+            set_git_author,
             perform_commit,
             perform_restore,
             perform_push,

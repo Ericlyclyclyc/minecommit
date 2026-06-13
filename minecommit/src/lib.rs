@@ -61,6 +61,8 @@ impl Config {
         parents: Vec<String>,
         message: &str,
         r#ref: Option<String>,
+        author_name: Option<&str>,
+        author_email: Option<&str>,
     ) -> Result<Vec<String>> {
         let save = LocalFsOdb::from_dir(self.save_dir.to_owned());
         let mut git = if let Some(from) = parents.first() {
@@ -80,7 +82,7 @@ impl Config {
             .filter(|item| !processed.contains(item))
             .collect::<Vec<_>>();
 
-        let commit = git.commit(parents.as_slice(), message)?;
+        let commit = git.commit(parents.as_slice(), message, author_name, author_email)?;
 
         if let Some(r#ref) = r#ref {
             let cmd = git_cmd(self.storage_dir.to_owned(), ["update-ref", &r#ref, &commit]);

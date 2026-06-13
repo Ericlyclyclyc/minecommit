@@ -8,7 +8,7 @@ export function CommitAuthorProvider({ children }: { children: ReactNode }) {
 
   const refreshAuthor = useCallback(async () => {
     try {
-      const data = await invoke<CommitAuthor>("get_commit_author")
+      const data = await invoke<CommitAuthor>("get_git_author")
       setAuthorState(data)
     } catch {
       // ignore
@@ -19,7 +19,7 @@ export function CommitAuthorProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let ignore = false
-    invoke<CommitAuthor>("get_commit_author")
+    invoke<CommitAuthor>("get_git_author")
       .then((data) => {
         if (!ignore) {
           setAuthorState(data)
@@ -35,7 +35,7 @@ export function CommitAuthorProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const setAuthor = useCallback(async (name: string, email: string) => {
-    const data = await invoke<CommitAuthor>("set_commit_author", { name, email })
+    const data = await invoke<CommitAuthor>("set_git_author", { name, email })
     setAuthorState(data)
   }, [])
 

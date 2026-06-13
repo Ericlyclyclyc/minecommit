@@ -90,10 +90,62 @@ jobs:
             minecommit-${{ github.ref_name }}-${{ matrix.target }}.zip
           if-no-files-found: error
 
+  build-tauri-windows:
+    name: Build Tauri GUI (Windows)
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        working-directory: minecommit-gui
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+
+      - name: Install Tauri CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
+
+      - name: Build portable Windows executable
+        run: bun tauri build --ci --target x86_64-pc-windows-msvc --no-bundle
+
+      - name: Prepare release artifact
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          Copy-Item `
+            target/x86_64-pc-windows-msvc/release/minecommit-gui.exe `
+            minecommit-gui-${{ github.ref_name }}-x86_64-pc-windows-msvc.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecommit-gui-x86_64-pc-windows-msvc
+          path: minecommit-gui-${{ github.ref_name }}-x86_64-pc-windows-msvc.exe
+          if-no-files-found: error
+
   release:
     name: Create Release
     needs:
       - build
+      - build-tauri-windows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
